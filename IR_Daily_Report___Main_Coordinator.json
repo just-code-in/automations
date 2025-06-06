@@ -1,0 +1,3259 @@
+{
+  "name": "IR Daily Report - Main Coordinator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0d8f295e-aabd-42b2-92fd-b743117b958f",
+      "name": "Daily Schedule (6:00 AM PST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -900,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"recipientEmail\": \"justin.s.simpson@gmail.com\",\n  \"sheetId\": \"1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE\",\n  \"sheetName\": \"IR Daily\"\n}\n",
+        "options": {}
+      },
+      "id": "4ebc074a-0e4b-4b39-9d61-a9a0c8596025",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        -700,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "e587aa65-ecb6-49e5-8a8b-17348b77b23b",
+      "name": "Read Company List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -540,
+        80
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WOIhnx5l3FPYsfrv",
+          "name": "Google "
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process ALL company data from Google Sheets\nconst allInputs = $input.all();\nconst configData = $('Configuration').first().json;\n\n// Extract company data from all inputs\nconst companies = allInputs.map((inputItem, index) => {\n  const row = inputItem.json;\n  return {\n    id: index + 1,\n    ticker: row.Symbol?.trim() || '',\n    industry: row.Industry?.trim() || '',\n    competitors: row.Competitors?.trim() || '',\n    cik: row.CIK?.trim() || ''\n  };\n}).filter(company => company.ticker);\n\n// Add configuration to each company\nconst processedCompanies = companies.map(company => ({\n  ...company,\n  config: {\n    recipientEmail: configData.recipientEmail,\n    reportDate: new Date().toISOString().split('T')[0],\n    processedAt: new Date().toISOString()\n  }\n}));\n\nreturn [\n  {\n    json: {\n      companies: processedCompanies,\n      metadata: {\n        totalCompanies: processedCompanies.length,\n        reportDate: new Date().toISOString().split('T')[0],\n        startTime: new Date().toISOString(),\n        recipientEmail: configData.recipientEmail\n      }\n    }\n  }\n];\n"
+      },
+      "id": "86dd5386-76a5-4590-94c1-4d25b1d1528c",
+      "name": "Process Company List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine summaries and insights for refinement\nconst companyData = $('Combine Agent Results').first().json;\nconst summaries = $('Call Summarization Agent').first().json;\nconst insights = $('Call Insight Generation Agent').first().json;\n\n// Structure data for the refinement agent\nreturn {\n  reportData: {\n    ticker: companyData.ticker,\n    stockPrice: companyData.companyData.stockPrice,\n    summaries: summaries.summaries || {},\n    keyInsight: insights.insight || { text: 'No insight available' },\n    metadata: {\n      processedAt: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "4611f766-4419-4678-9324-d41ab0594146",
+      "name": "Prepare for Refinement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4200,
+        -180
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": "Single Company Report Refinement Agent",
+        "options": {}
+      },
+      "id": "91b978ca-6151-4350-a1a1-861e43001526",
+      "name": "Call Refinement Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        4320,
+        -480
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store refined company report\nconst refinedData = $input.first().json;\nconst originalData = $('Combine Agent Results').first().json;\n\nreturn {\n  ticker: originalData.ticker,\n  refinedReport: refinedData.refinedReport || { text: 'Report generation failed' },\n  completedAt: new Date().toISOString()\n};"
+      },
+      "id": "f2b26db4-3044-43b1-865f-345209ec13d4",
+      "name": "Store Company Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4460,
+        120
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "26c86131-2395-4dea-8a1d-e758bb0bb636",
+      "name": "Continue Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4780,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all company reports for final delivery\nconst allReports = $input.all();\nconst metadata = $('Process Company List').first().json.metadata;\n\n// Structure final report data\nconst finalReportData = {\n  reportMetadata: {\n    reportDate: metadata.reportDate,\n    generatedAt: new Date().toISOString(),\n    recipientEmail: metadata.recipientEmail\n  },\n  companies: allReports.map(report => ({\n    ticker: report.json.ticker,\n    refinedReport: report.json.refinedReport\n  }))\n};\n\nreturn {\n  finalReportData: finalReportData\n};"
+      },
+      "id": "33e51796-4268-46ff-8adf-a5524d0f05b7",
+      "name": "Compile All Reports",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4940,
+        -400
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": "Report Compilation & Delivery Agent",
+        "options": {}
+      },
+      "id": "244cd996-9b07-4aa1-bb99-e31d734430ef",
+      "name": "Call Delivery Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        5140,
+        -400
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "id": "e1e0325a-cfcb-4d48-a573-9538c60316a4",
+      "name": "Execution Summary",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        5340,
+        -420
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        -180
+      ],
+      "id": "eb9e82aa-05ee-4dff-8d84-a4dc05cf1502",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HPmSsQsbOAVCRjx0",
+          "mode": "list",
+          "cachedResultName": "Stock Price Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -700
+      ],
+      "id": "cfb6a849-6b1b-4b40-ac9b-fb6c7abd618b",
+      "name": "Call Stock Price Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare companies for looping\nconst input = $input.first().json;\nconst companies = input.companies || [];\n\n// Return each company as a separate item for the loop\nreturn companies;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        -180
+      ],
+      "id": "62aded6e-1c29-416f-8d90-4ae9fabf3106",
+      "name": "Split out Companies"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "EJCIA43pMOLZqibi",
+          "mode": "list",
+          "cachedResultName": "Company & Competitor Research Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -520
+      ],
+      "id": "eba609ea-8f8d-4e74-aa2b-49ecb8787932",
+      "name": "Call Company & Competitor Research Agent"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Jv1IadFWHZxC7DPh",
+          "mode": "list",
+          "cachedResultName": "Industry Research Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        60
+      ],
+      "id": "9707949b-08ce-4c1a-bc1a-05c5d75395ea",
+      "name": "Call Industry Research Agent"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "zSI7SUDJa0EaU4z7",
+          "mode": "list",
+          "cachedResultName": "Macroeconomic Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -320
+      ],
+      "id": "3d2e0bdc-00a9-49e4-8a87-9aad50af3bf7",
+      "name": "Call Macroeconomic Agent"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "U1kMXotSHPAta0NW",
+          "mode": "list",
+          "cachedResultName": "Social Media Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -120
+      ],
+      "id": "c531b6ec-115b-495a-ac83-0ffd9da785d0",
+      "name": "Call Social Media Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3840,
+        0
+      ],
+      "id": "6c9eb721-4949-4562-9b90-55fd68bd5764",
+      "name": "Call Insight Generation Agent1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3860,
+        -380
+      ],
+      "id": "dd85c97c-85ce-4a40-8a5d-7c5a0122e4d6",
+      "name": "Call Summarisation Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4600,
+        -180
+      ],
+      "id": "e195c7bc-6882-4151-9ae8-6ea5637f886a",
+      "name": "Wait",
+      "webhookId": "717f7acb-eadb-41da-aa34-19d08ab875af"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform coordinator data for ALL agents\nconst companyData = $input.first().json;\n\nconsole.log('Processing company:', companyData.ticker);\n\nreturn [\n  // Item 1: For Stock Price Agent\n  {\n    agentType: 'stockPrice',\n    ticker: companyData.ticker\n  },\n  \n  // Item 2: For Company Research Agent  \n  {\n    agentType: 'companyResearch',\n    ticker: companyData.ticker,\n    competitors: companyData.competitors,\n    cik: companyData.cik\n  },\n  \n  // Item 3: For Industry Research Agent\n  {\n    agentType: 'industryResearch',\n    industry: companyData.industry,\n    ticker: companyData.ticker\n  },\n  \n  // Item 4: For Social Media Agent\n  {\n    agentType: 'socialMedia',\n    ticker: companyData.ticker,\n    companyName: companyData.ticker\n  },\n  \n  // Item 5: For Macroeconomic Agent\n  {\n    agentType: 'macroeconomic',\n    ticker: companyData.ticker,\n    industry: companyData.industry\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -180
+      ],
+      "id": "5ae94b0c-bdd3-42af-b03f-17968a9d8b2b",
+      "name": "Transform Company Data"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "stockPrice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "83b25091-ceea-4c04-91ed-c02cd4c21300"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cb21b577-a6a8-449e-8c32-9645bb6ff652",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "companyResearch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1317dcbc-edd6-481a-b25c-e56c7d85fe2e",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "industryResearch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "52380ef5-e488-435e-9e6a-425d14c4661d",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "socialMedia",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "94bfd2db-6728-4672-b4d0-863aea0427d7",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "macroeconomic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        300,
+        -320
+      ],
+      "id": "d89bf199-8519-425f-9195-c862f0ec9f48",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Now we have all 5 agent results in a single execution\nconst allInputs = $input.all();\n\nconsole.log('Total agent results received:', allInputs.length);\n\n// Initialize combined results\nlet combinedResults = {\n  ticker: null,\n  stockPrice: null,\n  companyResearch: null,\n  industryResearch: null,\n  socialMedia: null,\n  macroeconomic: null,\n  metadata: {\n    processedAt: new Date().toISOString(),\n    totalAgents: allInputs.length\n  }\n};\n\n// Process each agent result\nallInputs.forEach((input, index) => {\n  const data = input.json;\n  \n  console.log(`Agent ${index + 1} keys:`, Object.keys(data));\n  \n  // Extract ticker\n  if (data.ticker && !combinedResults.ticker) {\n    combinedResults.ticker = data.ticker;\n  }\n  \n  // Detect agent type\n  if (data.stockData || Object.keys(data).some(key => key.match(/^\\d{4}-\\d{2}-\\d{2}$/))) {\n    combinedResults.stockPrice = data;\n    console.log(`Agent ${index + 1}: Stock Price`);\n  }\n  else if (data.companyNews || data.competitorNews || data.secFilings) {\n    combinedResults.companyResearch = data;\n    console.log(`Agent ${index + 1}: Company Research`);\n  }\n  else if (data.industryNews) {\n    combinedResults.industryResearch = data;\n    console.log(`Agent ${index + 1}: Industry Research`);\n  }\n  else if (data.socialMentions) {\n    combinedResults.socialMedia = data;\n    console.log(`Agent ${index + 1}: Social Media`);\n  }\n  else if (data.economicNews) {\n    combinedResults.macroeconomic = data;\n    console.log(`Agent ${index + 1}: Macroeconomic`);\n  }\n  else {\n    console.log(`Agent ${index + 1}: Unidentified -`, Object.keys(data));\n  }\n});\n\nconsole.log('Successfully combined all agent results');\nreturn combinedResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        -320
+      ],
+      "id": "2fbaee82-03af-4810-b74d-59ecc35fe167",
+      "name": "Combine"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        1400,
+        -360
+      ],
+      "id": "f9ab6e0c-78a5-44eb-95bc-5ba39969cd25",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        920,
+        -120
+      ],
+      "id": "31fc6ef9-810c-4375-bc88-81183d26b1e8",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        920,
+        60
+      ],
+      "id": "11c243da-b3af-4024-9713-9c804daf6c66",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      row_number: 2,\n      Symbol: \"WMT\",\n      Industry: \"Consumer Staples – Hypermarkets & Discount Stores\",\n      Competitors: \"TGT, KR\",\n      CIK: \"0000104169\"\n    }\n  },\n  {\n    json: {\n      row_number: 3,\n      Symbol: \"JPM\",\n      Industry: \"Financial Services – Banking\",\n      Competitors: \"BAC, WFC\",\n      CIK: \"0000019617\"\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -180
+      ],
+      "id": "3ce88309-0e9b-45ec-bca1-f96bb5d6bfd5",
+      "name": "Simulate Google Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all agent results\nconst allInputs = $input.all();\n\nlet combinedResults = {\n  ticker: null,\n  stockPrice: null,\n  companyResearch: null,\n  industryResearch: null,\n  socialMedia: null,\n  macroeconomic: null,\n  metadata: {\n    processedAt: new Date().toISOString(),\n    totalAgents: allInputs.length\n  }\n};\n\nallInputs.forEach((input, index) => {\n  const data = input.json;\n\n  // Try to extract the ticker if available\n  if (data.ticker && !combinedResults.ticker) {\n    combinedResults.ticker = data.ticker;\n  }\n\n  // Detect Stock Price Agent\n  if (data.stockData && Array.isArray(data.stockData) && data.stockData[0]?.dailyPrices) {\n    combinedResults.stockPrice = data;\n  }\n\n  // Detect Company Research Agent\n  else if (data.companyNews && data.competitorNews && data.secFilings) {\n    combinedResults.companyResearch = data;\n  }\n\n  // Detect Industry Research Agent\n  else if (data.industryNews && data.summary && typeof data.summary.totalArticles === 'number') {\n    combinedResults.industryResearch = data;\n  }\n\n  // Detect Social Media Agent (looser match)\n  else if (data.summary && typeof data.summary.totalMentions === 'number') {\n    combinedResults.socialMedia = data;\n  }\n\n  // Detect Macroeconomic Agent\n  else if (\n    data.overallEnvironment &&\n    data.impactAssessment &&\n    data.summary &&\n    typeof data.summary.totalArticles === 'number'\n  ) {\n    combinedResults.macroeconomic = data;\n  }\n\n  // If unknown\n  else {\n    console.log(`Agent ${index + 1} not matched. Keys:`, Object.keys(data));\n  }\n});\n\nreturn combinedResults;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2740,
+        -320
+      ],
+      "id": "8be5b9c1-f1b3-49b0-a220-1456741ddbf1",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5222305c-0eba-4628-984d-a5fa840f369f",
+              "name": "=debug",
+              "value": "={{ $json }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1580,
+        -320
+      ],
+      "id": "aeb79311-ec70-472c-b341-0526ea8deaa6",
+      "name": "Debug Set Node"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node parses the nested JSON string into real JSON so downstream nodes can access the structure.\nreturn $input.all().map(item => {\n  const parsed = JSON.parse(item.json.debug);\n  return {\n    json: parsed,\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        -320
+      ],
+      "id": "b1b956ac-f9fd-4788-975b-f22182e562c6",
+      "name": "Parse Debug JSON"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60e307fc-2734-443c-9485-5b63feb6f0e5",
+              "name": "=macroeconomic",
+              "value": "={{(() => {\n  try {\n    const macro = $json.debug.data?.find(d => d.type === 'macroeconomic_analysis');\n    const articles = macro?.categorizedArticles?.monetaryPolicy || [];\n    return articles.map(a => `- ${a.title} (${a.impact})`).join('\\n') || null;\n  } catch (e) {\n    return null;\n  }\n})()}}\n\n",
+              "type": "string"
+            },
+            {
+              "id": "d0c03cf6-6dc4-4284-afce-d8b61f5bbfba",
+              "name": "=companyResearch",
+              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const primary = debug.primaryCompany?.articles || [];     return primary.length ? primary.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "21ab2df0-5e04-4349-af5d-6c3b3de65329",
+              "name": "=industryReserach",
+              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const industry = debug.industryNews || [];     return industry.length ? industry.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "93b24d6f-3a83-4730-9e17-08bae929518b",
+              "name": "=socialMedia",
+              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const social = debug.data?.find(d => d.type === 'social_media_analysis');     const mentions = social?.socialMentions || [];     return mentions.map(m => `- ${m.title} (${m.sentiment})`).join('\\n') || null;   } catch (e) {     return null;   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "0495f0e7-6539-475d-ab75-a1bc30c0ff7d",
+              "name": "test",
+              "value": "={{(() => 'Expression is working!')()}}",
+              "type": "string"
+            },
+            {
+              "id": "bf323993-79a4-45d2-ac22-429213bb6b48",
+              "name": "stockPrice",
+              "value": "={{(() => {\n  try {\n    const parsed = JSON.parse($json.debug);\n    const timeSeries = parsed.debug?.allInputs?.[0]?.[\"Time Series (Daily)\"];\n    if (!timeSeries) return \"No time series data found.\";\n    const latestDate = Object.keys(timeSeries).sort().reverse()[0];\n    const closePrice = timeSeries[latestDate]?.[\"4. close\"];\n    return closePrice\n      ? `$${parseFloat(closePrice).toFixed(2)} (as of ${latestDate})`\n      : \"No close price.\";\n  } catch (e) {\n    return `Error parsing JSON: ${e.message}`;\n  }\n})()}}\n\n\n\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        -320
+      ],
+      "id": "107068f6-3426-4d40-be05-4733bb592e86",
+      "name": "Summary Builder"
+    }
+  ],
+  "pinData": {
+    "Call Stock Price Agent": [
+      {
+        "json": {
+          "debug": true,
+          "inputCount": 1,
+          "allInputs": [
+            {
+              "Meta Data": {
+                "1. Information": "Daily Prices (open, high, low, close) and Volumes",
+                "2. Symbol": "WMT",
+                "3. Last Refreshed": "2025-06-05",
+                "4. Output Size": "Compact",
+                "5. Time Zone": "US/Eastern"
+              },
+              "Time Series (Daily)": {
+                "2025-06-05": {
+                  "1. open": "99.2950",
+                  "2. high": "99.5900",
+                  "3. low": "97.6050",
+                  "4. close": "97.9600",
+                  "5. volume": "15825276"
+                },
+                "2025-06-04": {
+                  "1. open": "99.7900",
+                  "2. high": "100.1300",
+                  "3. low": "99.3200",
+                  "4. close": "99.3500",
+                  "5. volume": "11115649"
+                },
+                "2025-06-03": {
+                  "1. open": "99.5650",
+                  "2. high": "100.8900",
+                  "3. low": "98.5700",
+                  "4. close": "99.9800",
+                  "5. volume": "15598643"
+                },
+                "2025-06-02": {
+                  "1. open": "98.8400",
+                  "2. high": "99.9050",
+                  "3. low": "98.0500",
+                  "4. close": "99.7700",
+                  "5. volume": "16999205"
+                },
+                "2025-05-30": {
+                  "1. open": "96.9600",
+                  "2. high": "98.9300",
+                  "3. low": "96.6000",
+                  "4. close": "98.7200",
+                  "5. volume": "29980069"
+                },
+                "2025-05-29": {
+                  "1. open": "97.6300",
+                  "2. high": "97.7700",
+                  "3. low": "96.8509",
+                  "4. close": "97.1000",
+                  "5. volume": "14343738"
+                },
+                "2025-05-28": {
+                  "1. open": "97.5200",
+                  "2. high": "98.2400",
+                  "3. low": "97.0600",
+                  "4. close": "97.2400",
+                  "5. volume": "11220098"
+                },
+                "2025-05-27": {
+                  "1. open": "97.3000",
+                  "2. high": "97.7950",
+                  "3. low": "96.5800",
+                  "4. close": "97.5800",
+                  "5. volume": "17180937"
+                },
+                "2025-05-23": {
+                  "1. open": "95.3400",
+                  "2. high": "96.5400",
+                  "3. low": "95.0000",
+                  "4. close": "96.3400",
+                  "5. volume": "13668621"
+                },
+                "2025-05-22": {
+                  "1. open": "96.5400",
+                  "2. high": "96.9600",
+                  "3. low": "95.8150",
+                  "4. close": "95.9300",
+                  "5. volume": "13712163"
+                },
+                "2025-05-21": {
+                  "1. open": "97.1250",
+                  "2. high": "97.7556",
+                  "3. low": "95.9750",
+                  "4. close": "96.4300",
+                  "5. volume": "15742336"
+                },
+                "2025-05-20": {
+                  "1. open": "98.5550",
+                  "2. high": "98.8183",
+                  "3. low": "96.5200",
+                  "4. close": "97.8000",
+                  "5. volume": "15609610"
+                },
+                "2025-05-19": {
+                  "1. open": "96.6500",
+                  "2. high": "98.2800",
+                  "3. low": "95.8100",
+                  "4. close": "98.1200",
+                  "5. volume": "20041573"
+                },
+                "2025-05-16": {
+                  "1. open": "96.1400",
+                  "2. high": "99.1946",
+                  "3. low": "95.9950",
+                  "4. close": "98.2400",
+                  "5. volume": "33746187"
+                },
+                "2025-05-15": {
+                  "1. open": "94.3000",
+                  "2. high": "96.7200",
+                  "3. low": "91.8900",
+                  "4. close": "96.3500",
+                  "5. volume": "44026125"
+                },
+                "2025-05-14": {
+                  "1. open": "96.0250",
+                  "2. high": "97.3300",
+                  "3. low": "95.8300",
+                  "4. close": "96.8300",
+                  "5. volume": "25620110"
+                },
+                "2025-05-13": {
+                  "1. open": "96.5000",
+                  "2. high": "97.3200",
+                  "3. low": "95.2250",
+                  "4. close": "95.8800",
+                  "5. volume": "19746658"
+                },
+                "2025-05-12": {
+                  "1. open": "97.6700",
+                  "2. high": "97.9700",
+                  "3. low": "95.6200",
+                  "4. close": "96.7500",
+                  "5. volume": "26783925"
+                },
+                "2025-05-09": {
+                  "1. open": "96.7500",
+                  "2. high": "97.2000",
+                  "3. low": "96.2900",
+                  "4. close": "96.7200",
+                  "5. volume": "13697822"
+                },
+                "2025-05-08": {
+                  "1. open": "98.7500",
+                  "2. high": "99.3300",
+                  "3. low": "97.3550",
+                  "4. close": "97.4300",
+                  "5. volume": "14461119"
+                },
+                "2025-05-07": {
+                  "1. open": "98.5500",
+                  "2. high": "99.2308",
+                  "3. low": "98.3100",
+                  "4. close": "98.8300",
+                  "5. volume": "11310191"
+                },
+                "2025-05-06": {
+                  "1. open": "98.7400",
+                  "2. high": "99.4700",
+                  "3. low": "98.4100",
+                  "4. close": "98.5500",
+                  "5. volume": "10625999"
+                },
+                "2025-05-05": {
+                  "1. open": "98.9400",
+                  "2. high": "99.7400",
+                  "3. low": "98.5300",
+                  "4. close": "99.3300",
+                  "5. volume": "12439132"
+                },
+                "2025-05-02": {
+                  "1. open": "97.9500",
+                  "2. high": "99.2200",
+                  "3. low": "97.8500",
+                  "4. close": "98.7500",
+                  "5. volume": "16031373"
+                },
+                "2025-05-01": {
+                  "1. open": "97.0150",
+                  "2. high": "97.9000",
+                  "3. low": "96.5900",
+                  "4. close": "97.4100",
+                  "5. volume": "13171784"
+                },
+                "2025-04-30": {
+                  "1. open": "95.9400",
+                  "2. high": "97.7800",
+                  "3. low": "94.9300",
+                  "4. close": "97.2500",
+                  "5. volume": "21639860"
+                },
+                "2025-04-29": {
+                  "1. open": "94.8400",
+                  "2. high": "96.1800",
+                  "3. low": "94.4200",
+                  "4. close": "96.0400",
+                  "5. volume": "12679025"
+                },
+                "2025-04-28": {
+                  "1. open": "95.1000",
+                  "2. high": "96.0000",
+                  "3. low": "94.3400",
+                  "4. close": "95.2200",
+                  "5. volume": "12950000"
+                },
+                "2025-04-25": {
+                  "1. open": "95.8000",
+                  "2. high": "96.4700",
+                  "3. low": "94.3600",
+                  "4. close": "95.0900",
+                  "5. volume": "15317220"
+                },
+                "2025-04-24": {
+                  "1. open": "94.7100",
+                  "2. high": "96.2150",
+                  "3. low": "93.6601",
+                  "4. close": "95.8400",
+                  "5. volume": "13444528"
+                },
+                "2025-04-23": {
+                  "1. open": "95.0164",
+                  "2. high": "96.6000",
+                  "3. low": "94.1619",
+                  "4. close": "94.9600",
+                  "5. volume": "18046886"
+                },
+                "2025-04-22": {
+                  "1. open": "92.8800",
+                  "2. high": "95.2900",
+                  "3. low": "92.8800",
+                  "4. close": "94.8500",
+                  "5. volume": "15407774"
+                },
+                "2025-04-21": {
+                  "1. open": "93.0200",
+                  "2. high": "94.0800",
+                  "3. low": "91.3400",
+                  "4. close": "92.4100",
+                  "5. volume": "18361208"
+                },
+                "2025-04-17": {
+                  "1. open": "91.8300",
+                  "2. high": "93.8700",
+                  "3. low": "91.6200",
+                  "4. close": "93.2200",
+                  "5. volume": "21393917"
+                },
+                "2025-04-16": {
+                  "1. open": "94.0000",
+                  "2. high": "94.3000",
+                  "3. low": "90.6100",
+                  "4. close": "91.1900",
+                  "5. volume": "22229105"
+                },
+                "2025-04-15": {
+                  "1. open": "94.8200",
+                  "2. high": "96.0300",
+                  "3. low": "93.8700",
+                  "4. close": "93.9700",
+                  "5. volume": "21871213"
+                },
+                "2025-04-14": {
+                  "1. open": "93.2700",
+                  "2. high": "95.4400",
+                  "3. low": "92.9000",
+                  "4. close": "94.7300",
+                  "5. volume": "27742915"
+                },
+                "2025-04-11": {
+                  "1. open": "90.6800",
+                  "2. high": "93.3500",
+                  "3. low": "90.0100",
+                  "4. close": "92.8000",
+                  "5. volume": "25508136"
+                },
+                "2025-04-10": {
+                  "1. open": "88.7300",
+                  "2. high": "91.8700",
+                  "3. low": "88.1634",
+                  "4. close": "90.6100",
+                  "5. volume": "34735323"
+                },
+                "2025-04-09": {
+                  "1. open": "83.3250",
+                  "2. high": "90.8000",
+                  "3. low": "83.0200",
+                  "4. close": "89.6000",
+                  "5. volume": "46632755"
+                },
+                "2025-04-08": {
+                  "1. open": "85.8500",
+                  "2. high": "86.9650",
+                  "3. low": "81.0300",
+                  "4. close": "81.7900",
+                  "5. volume": "34351744"
+                },
+                "2025-04-07": {
+                  "1. open": "80.2400",
+                  "2. high": "86.2600",
+                  "3. low": "79.8100",
+                  "4. close": "83.8300",
+                  "5. volume": "36884944"
+                },
+                "2025-04-04": {
+                  "1. open": "85.6400",
+                  "2. high": "87.3900",
+                  "3. low": "82.6500",
+                  "4. close": "83.1900",
+                  "5. volume": "36209015"
+                },
+                "2025-04-03": {
+                  "1. open": "86.2800",
+                  "2. high": "89.8800",
+                  "3. low": "86.2800",
+                  "4. close": "87.2600",
+                  "5. volume": "33012927"
+                },
+                "2025-04-02": {
+                  "1. open": "88.2000",
+                  "2. high": "90.1450",
+                  "3. low": "88.1175",
+                  "4. close": "89.7600",
+                  "5. volume": "19384137"
+                },
+                "2025-04-01": {
+                  "1. open": "87.5350",
+                  "2. high": "89.1100",
+                  "3. low": "87.3700",
+                  "4. close": "88.8300",
+                  "5. volume": "22080252"
+                },
+                "2025-03-31": {
+                  "1. open": "84.7600",
+                  "2. high": "88.2000",
+                  "3. low": "84.3700",
+                  "4. close": "87.7900",
+                  "5. volume": "30269313"
+                },
+                "2025-03-28": {
+                  "1. open": "85.4300",
+                  "2. high": "85.8300",
+                  "3. low": "84.7000",
+                  "4. close": "85.1500",
+                  "5. volume": "14790567"
+                },
+                "2025-03-27": {
+                  "1. open": "84.7750",
+                  "2. high": "86.1100",
+                  "3. low": "84.7750",
+                  "4. close": "85.6300",
+                  "5. volume": "16782807"
+                },
+                "2025-03-26": {
+                  "1. open": "85.1900",
+                  "2. high": "85.5600",
+                  "3. low": "84.5700",
+                  "4. close": "85.2100",
+                  "5. volume": "27241495"
+                },
+                "2025-03-25": {
+                  "1. open": "86.7600",
+                  "2. high": "87.3050",
+                  "3. low": "84.6200",
+                  "4. close": "84.7600",
+                  "5. volume": "27908573"
+                },
+                "2025-03-24": {
+                  "1. open": "86.4700",
+                  "2. high": "87.6500",
+                  "3. low": "86.3500",
+                  "4. close": "87.4900",
+                  "5. volume": "17900732"
+                },
+                "2025-03-21": {
+                  "1. open": "85.2800",
+                  "2. high": "86.2300",
+                  "3. low": "84.7800",
+                  "4. close": "85.9800",
+                  "5. volume": "26797178"
+                },
+                "2025-03-20": {
+                  "1. open": "85.8100",
+                  "2. high": "87.0800",
+                  "3. low": "85.5150",
+                  "4. close": "85.8100",
+                  "5. volume": "18185506"
+                },
+                "2025-03-19": {
+                  "1. open": "85.9500",
+                  "2. high": "86.7850",
+                  "3. low": "85.6200",
+                  "4. close": "86.3300",
+                  "5. volume": "24555857"
+                },
+                "2025-03-18": {
+                  "1. open": "87.4400",
+                  "2. high": "87.6750",
+                  "3. low": "85.5000",
+                  "4. close": "85.5900",
+                  "5. volume": "17850930"
+                },
+                "2025-03-17": {
+                  "1. open": "85.1300",
+                  "2. high": "87.9850",
+                  "3. low": "84.9800",
+                  "4. close": "87.4600",
+                  "5. volume": "26297768"
+                },
+                "2025-03-14": {
+                  "1. open": "84.9600",
+                  "2. high": "85.3700",
+                  "3. low": "84.0600",
+                  "4. close": "85.3500",
+                  "5. volume": "35500647"
+                },
+                "2025-03-13": {
+                  "1. open": "84.9400",
+                  "2. high": "85.4500",
+                  "3. low": "83.8700",
+                  "4. close": "84.5000",
+                  "5. volume": "31507753"
+                },
+                "2025-03-12": {
+                  "1. open": "87.8800",
+                  "2. high": "89.1000",
+                  "3. low": "84.8800",
+                  "4. close": "85.2000",
+                  "5. volume": "33301609"
+                },
+                "2025-03-11": {
+                  "1. open": "87.2900",
+                  "2. high": "89.3450",
+                  "3. low": "87.1400",
+                  "4. close": "87.4400",
+                  "5. volume": "28687586"
+                },
+                "2025-03-10": {
+                  "1. open": "89.7600",
+                  "2. high": "90.2300",
+                  "3. low": "86.6100",
+                  "4. close": "87.8200",
+                  "5. volume": "35029553"
+                },
+                "2025-03-07": {
+                  "1. open": "93.9400",
+                  "2. high": "93.9500",
+                  "3. low": "90.7600",
+                  "4. close": "91.7200",
+                  "5. volume": "35913156"
+                },
+                "2025-03-06": {
+                  "1. open": "94.8000",
+                  "2. high": "96.1900",
+                  "3. low": "94.1833",
+                  "4. close": "94.6400",
+                  "5. volume": "19957804"
+                },
+                "2025-03-05": {
+                  "1. open": "94.9700",
+                  "2. high": "96.3900",
+                  "3. low": "94.7500",
+                  "4. close": "95.9800",
+                  "5. volume": "17638956"
+                },
+                "2025-03-04": {
+                  "1. open": "95.7600",
+                  "2. high": "97.0500",
+                  "3. low": "94.4600",
+                  "4. close": "94.9700",
+                  "5. volume": "25227673"
+                },
+                "2025-03-03": {
+                  "1. open": "97.9800",
+                  "2. high": "99.4900",
+                  "3. low": "96.8250",
+                  "4. close": "97.5900",
+                  "5. volume": "18372193"
+                },
+                "2025-02-28": {
+                  "1. open": "97.7900",
+                  "2. high": "98.8600",
+                  "3. low": "97.1700",
+                  "4. close": "98.6100",
+                  "5. volume": "25451260"
+                },
+                "2025-02-27": {
+                  "1. open": "95.9000",
+                  "2. high": "98.0399",
+                  "3. low": "95.8092",
+                  "4. close": "96.7900",
+                  "5. volume": "16431469"
+                },
+                "2025-02-26": {
+                  "1. open": "97.7000",
+                  "2. high": "98.7250",
+                  "3. low": "96.0700",
+                  "4. close": "96.2000",
+                  "5. volume": "19069721"
+                },
+                "2025-02-25": {
+                  "1. open": "94.3500",
+                  "2. high": "97.9100",
+                  "3. low": "94.2400",
+                  "4. close": "97.6900",
+                  "5. volume": "29331188"
+                },
+                "2025-02-24": {
+                  "1. open": "94.1800",
+                  "2. high": "94.6400",
+                  "3. low": "92.1200",
+                  "4. close": "93.6700",
+                  "5. volume": "29755875"
+                },
+                "2025-02-21": {
+                  "1. open": "96.5300",
+                  "2. high": "96.8500",
+                  "3. low": "94.1150",
+                  "4. close": "94.7800",
+                  "5. volume": "35014806"
+                },
+                "2025-02-20": {
+                  "1. open": "98.7800",
+                  "2. high": "100.1200",
+                  "3. low": "96.6808",
+                  "4. close": "97.2100",
+                  "5. volume": "55450924"
+                },
+                "2025-02-19": {
+                  "1. open": "103.8500",
+                  "2. high": "104.2000",
+                  "3. low": "102.5500",
+                  "4. close": "104.0000",
+                  "5. volume": "18507981"
+                },
+                "2025-02-18": {
+                  "1. open": "103.7200",
+                  "2. high": "103.9900",
+                  "3. low": "102.5100",
+                  "4. close": "103.7800",
+                  "5. volume": "18247314"
+                },
+                "2025-02-14": {
+                  "1. open": "105.3000",
+                  "2. high": "105.3000",
+                  "3. low": "103.6000",
+                  "4. close": "104.0400",
+                  "5. volume": "14109460"
+                },
+                "2025-02-13": {
+                  "1. open": "104.0000",
+                  "2. high": "105.2400",
+                  "3. low": "103.5300",
+                  "4. close": "105.0500",
+                  "5. volume": "12604413"
+                },
+                "2025-02-12": {
+                  "1. open": "102.1200",
+                  "2. high": "103.9000",
+                  "3. low": "102.0400",
+                  "4. close": "103.6100",
+                  "5. volume": "15162125"
+                },
+                "2025-02-11": {
+                  "1. open": "102.6200",
+                  "2. high": "102.8500",
+                  "3. low": "101.8500",
+                  "4. close": "102.4700",
+                  "5. volume": "11953632"
+                },
+                "2025-02-10": {
+                  "1. open": "101.9500",
+                  "2. high": "102.9300",
+                  "3. low": "101.2500",
+                  "4. close": "102.9200",
+                  "5. volume": "15274644"
+                },
+                "2025-02-07": {
+                  "1. open": "103.0000",
+                  "2. high": "103.1100",
+                  "3. low": "101.1100",
+                  "4. close": "101.1500",
+                  "5. volume": "12451072"
+                },
+                "2025-02-06": {
+                  "1. open": "102.5300",
+                  "2. high": "103.0200",
+                  "3. low": "101.9400",
+                  "4. close": "102.8500",
+                  "5. volume": "13088467"
+                },
+                "2025-02-05": {
+                  "1. open": "100.6500",
+                  "2. high": "102.5800",
+                  "3. low": "100.5400",
+                  "4. close": "102.4600",
+                  "5. volume": "15926717"
+                },
+                "2025-02-04": {
+                  "1. open": "99.9700",
+                  "2. high": "100.9500",
+                  "3. low": "99.6900",
+                  "4. close": "100.7700",
+                  "5. volume": "15201194"
+                },
+                "2025-02-03": {
+                  "1. open": "96.7700",
+                  "2. high": "99.7900",
+                  "3. low": "96.4700",
+                  "4. close": "99.5400",
+                  "5. volume": "20484152"
+                },
+                "2025-01-31": {
+                  "1. open": "99.0000",
+                  "2. high": "99.0000",
+                  "3. low": "97.7000",
+                  "4. close": "98.1600",
+                  "5. volume": "16413893"
+                },
+                "2025-01-30": {
+                  "1. open": "97.6900",
+                  "2. high": "98.9300",
+                  "3. low": "97.4200",
+                  "4. close": "98.6500",
+                  "5. volume": "11012220"
+                },
+                "2025-01-29": {
+                  "1. open": "97.4250",
+                  "2. high": "98.1700",
+                  "3. low": "97.2200",
+                  "4. close": "97.5000",
+                  "5. volume": "11261444"
+                },
+                "2025-01-28": {
+                  "1. open": "97.2300",
+                  "2. high": "97.8400",
+                  "3. low": "96.7251",
+                  "4. close": "97.2900",
+                  "5. volume": "14641621"
+                },
+                "2025-01-27": {
+                  "1. open": "95.9000",
+                  "2. high": "97.4600",
+                  "3. low": "94.8200",
+                  "4. close": "97.4000",
+                  "5. volume": "18880614"
+                },
+                "2025-01-24": {
+                  "1. open": "93.5400",
+                  "2. high": "95.0100",
+                  "3. low": "93.4550",
+                  "4. close": "94.7600",
+                  "5. volume": "14973773"
+                },
+                "2025-01-23": {
+                  "1. open": "92.9600",
+                  "2. high": "93.8100",
+                  "3. low": "92.3200",
+                  "4. close": "93.8100",
+                  "5. volume": "14198438"
+                },
+                "2025-01-22": {
+                  "1. open": "93.7700",
+                  "2. high": "94.0000",
+                  "3. low": "92.5200",
+                  "4. close": "93.2300",
+                  "5. volume": "15567057"
+                },
+                "2025-01-21": {
+                  "1. open": "92.4800",
+                  "2. high": "94.2400",
+                  "3. low": "92.3100",
+                  "4. close": "93.0800",
+                  "5. volume": "23247451"
+                },
+                "2025-01-17": {
+                  "1. open": "92.0700",
+                  "2. high": "92.2600",
+                  "3. low": "91.0500",
+                  "4. close": "91.9400",
+                  "5. volume": "15868213"
+                },
+                "2025-01-16": {
+                  "1. open": "91.5000",
+                  "2. high": "91.7200",
+                  "3. low": "90.1200",
+                  "4. close": "91.3000",
+                  "5. volume": "13267723"
+                },
+                "2025-01-15": {
+                  "1. open": "91.0650",
+                  "2. high": "91.7250",
+                  "3. low": "90.8100",
+                  "4. close": "91.3400",
+                  "5. volume": "17348174"
+                },
+                "2025-01-14": {
+                  "1. open": "91.8600",
+                  "2. high": "91.9800",
+                  "3. low": "90.5650",
+                  "4. close": "90.7900",
+                  "5. volume": "13549159"
+                },
+                "2025-01-13": {
+                  "1. open": "92.1200",
+                  "2. high": "92.4300",
+                  "3. low": "91.1000",
+                  "4. close": "91.5300",
+                  "5. volume": "18617077"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "Call Company & Competitor Research Agent": [
+      {
+        "json": {
+          "primaryCompany": {
+            "type": "primary",
+            "articles": []
+          },
+          "competitors": [],
+          "secFilings": {
+            "type": "sec_filings",
+            "filings": [
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016810/0001127602-25-016810-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016791/0001127602-25-016791-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016787/0001127602-25-016787-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016780/0001127602-25-016780-index.html"
+              },
+              {
+                "form": "144",
+                "filingDate": "2025-06-02",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000195824425003131/0001958244-25-003131-index.html"
+              },
+              {
+                "form": "144",
+                "filingDate": "2025-06-02",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000196858225000434/0001968582-25-000434-index.html"
+              }
+            ]
+          },
+          "summary": {
+            "primaryArticles": 0,
+            "competitorArticles": 0,
+            "secFilings": 6,
+            "processedAt": "2025-06-06T13:15:01.837Z"
+          }
+        }
+      }
+    ],
+    "Call Macroeconomic Agent": [
+      {
+        "json": {
+          "type": "macroeconomic_analysis",
+          "overallEnvironment": "supportive",
+          "impactAssessment": {
+            "supportive": 1,
+            "challenging": 0,
+            "mixed": 0,
+            "neutral": 2
+          },
+          "keyThemes": [],
+          "categorizedArticles": {
+            "monetaryPolicy": [
+              {
+                "title": "Kohl's, Gap, Best Buy and More Retailers Say Tariff Court Rulings Don't ...",
+                "url": "https://www.wsj.com/business/retail/trump-tariff-court-ruling-kohls-best-buy-20cb2708",
+                "snippet": "WSJ's Asia economics reporter explains how markets have reacted after a federal trade court struck down President Trump's sweeping tariffs and the implications for international trade....",
+                "source": "www.wsj.com",
+                "impact": "neutral",
+                "category": "monetary_policy"
+              },
+              {
+                "title": "Finance and Markets - WSJ.com - The Wall Street Journal",
+                "url": "https://www.wsj.com/finance",
+                "snippet": "The latest finance and stock market news covering the Dow, S&P 500, banking, investing and regulation....",
+                "source": "www.wsj.com",
+                "impact": "neutral",
+                "category": "monetary_policy"
+              },
+              {
+                "title": "US Consumers Hit the Brakes While Goods Imports Sink by a Record",
+                "url": "https://www.bloomberg.com/news/articles/2025-05-30/us-consumer-spending-growth-slows-while-inflation-remains-soft",
+                "snippet": "US Consumers Hit the Brakes While Goods Imports Sink by a Record - Bloomberg Bloomberg *   [Bloomberg Anywhere Remote Login](https://bba.bloomberg.net/?utm_source=bloomberg-menu&utm_medium=bcom) *   [...",
+                "source": "www.bloomberg.com",
+                "impact": "supportive",
+                "category": "monetary_policy"
+              }
+            ],
+            "tradeAndGlobal": [],
+            "industryPolicy": []
+          },
+          "allArticles": [
+            {
+              "title": "Kohl's, Gap, Best Buy and More Retailers Say Tariff Court Rulings Don't ...",
+              "url": "https://www.wsj.com/business/retail/trump-tariff-court-ruling-kohls-best-buy-20cb2708",
+              "snippet": "WSJ's Asia economics reporter explains how markets have reacted after a federal trade court struck down President Trump's sweeping tariffs and the implications for international trade....",
+              "source": "www.wsj.com",
+              "impact": "neutral",
+              "category": "monetary_policy"
+            },
+            {
+              "title": "Finance and Markets - WSJ.com - The Wall Street Journal",
+              "url": "https://www.wsj.com/finance",
+              "snippet": "The latest finance and stock market news covering the Dow, S&P 500, banking, investing and regulation....",
+              "source": "www.wsj.com",
+              "impact": "neutral",
+              "category": "monetary_policy"
+            },
+            {
+              "title": "US Consumers Hit the Brakes While Goods Imports Sink by a Record",
+              "url": "https://www.bloomberg.com/news/articles/2025-05-30/us-consumer-spending-growth-slows-while-inflation-remains-soft",
+              "snippet": "US Consumers Hit the Brakes While Goods Imports Sink by a Record - Bloomberg Bloomberg *   [Bloomberg Anywhere Remote Login](https://bba.bloomberg.net/?utm_source=bloomberg-menu&utm_medium=bcom) *   [...",
+              "source": "www.bloomberg.com",
+              "impact": "supportive",
+              "category": "monetary_policy"
+            }
+          ],
+          "summary": {
+            "totalArticles": 3,
+            "articlesByCategory": {
+              "monetaryPolicy": 3,
+              "tradeAndGlobal": 0,
+              "industryPolicy": 0
+            },
+            "sources": [
+              "www.wsj.com",
+              "www.bloomberg.com"
+            ],
+            "processedAt": "2025-06-06T13:15:12.840Z",
+            "daysCovered": 4
+          },
+          "metadata": {
+            "searchQueries": [
+              "Federal Reserve interest rates inflation economic policy",
+              "trade policy tariffs supply chain global economy",
+              "undefined industry economic impact regulation government policy"
+            ],
+            "targetSources": [
+              "reuters.com",
+              "bloomberg.com",
+              "wsj.com",
+              "ft.com",
+              "cnbc.com",
+              "federalreserve.gov"
+            ]
+          },
+          "debug": {
+            "totalInputs": 1,
+            "inputStatus": [
+              "exists"
+            ],
+            "hasMonetaryData": true,
+            "hasTradeData": true,
+            "hasIndustryData": true
+          }
+        }
+      }
+    ],
+    "Call Social Media Agent": [
+      {
+        "json": {
+          "type": "social_media_analysis",
+          "overallSentiment": "neutral",
+          "sentimentBreakdown": {
+            "positive": "20%",
+            "negative": "20%",
+            "neutral": "60%"
+          },
+          "keyTopics": [
+            "stock",
+            "price",
+            "target",
+            "buy",
+            "downgrade"
+          ],
+          "socialMentions": [
+            {
+              "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+              "url": "https://stocktwits.com/symbol/WMT/sentiment",
+              "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+              "source": "stocktwits.com",
+              "sentiment": "neutral",
+              "type": "social_mention"
+            },
+            {
+              "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+              "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+              "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+              "source": "seekingalpha.com",
+              "sentiment": "negative",
+              "type": "social_mention"
+            },
+            {
+              "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+              "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+              "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+              "source": "seekingalpha.com",
+              "sentiment": "neutral",
+              "type": "social_mention"
+            },
+            {
+              "title": "Walmart stock trades in the green for seven consecutive days",
+              "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+              "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+              "source": "seekingalpha.com",
+              "sentiment": "positive",
+              "type": "social_mention"
+            },
+            {
+              "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+              "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+              "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+              "source": "seekingalpha.com",
+              "sentiment": "neutral",
+              "type": "social_mention"
+            }
+          ],
+          "investorSentiment": [
+            {
+              "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+              "url": "https://stocktwits.com/symbol/WMT/sentiment",
+              "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+              "source": "stocktwits.com",
+              "sentiment": "neutral",
+              "type": "investor_sentiment"
+            },
+            {
+              "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+              "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+              "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+              "source": "seekingalpha.com",
+              "sentiment": "negative",
+              "type": "investor_sentiment"
+            },
+            {
+              "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+              "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+              "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+              "source": "seekingalpha.com",
+              "sentiment": "neutral",
+              "type": "investor_sentiment"
+            },
+            {
+              "title": "Walmart stock trades in the green for seven consecutive days",
+              "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+              "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+              "source": "seekingalpha.com",
+              "sentiment": "positive",
+              "type": "investor_sentiment"
+            },
+            {
+              "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+              "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+              "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+              "source": "seekingalpha.com",
+              "sentiment": "neutral",
+              "type": "investor_sentiment"
+            }
+          ],
+          "summary": {
+            "totalMentions": 10,
+            "socialPlatforms": [
+              "stocktwits.com",
+              "seekingalpha.com"
+            ],
+            "processedAt": "2025-06-06T13:18:24.304Z",
+            "daysCovered": 2
+          },
+          "metadata": {
+            "searchQueries": [
+              "undefined undefined reddit discussion sentiment stock",
+              "undefined stock price target opinion investor sentiment"
+            ],
+            "sources": [
+              "stocktwits.com",
+              "seekingalpha.com"
+            ]
+          }
+        }
+      }
+    ],
+    "Aggregate": [
+      {
+        "json": {
+          "data": [
+            {
+              "type": "social_media_analysis",
+              "overallSentiment": "neutral",
+              "sentimentBreakdown": {
+                "positive": "20%",
+                "negative": "20%",
+                "neutral": "60%"
+              },
+              "keyTopics": [
+                "stock",
+                "price",
+                "target",
+                "buy",
+                "downgrade"
+              ],
+              "socialMentions": [
+                {
+                  "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+                  "url": "https://stocktwits.com/symbol/WMT/sentiment",
+                  "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+                  "source": "stocktwits.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+                  "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+                  "source": "seekingalpha.com",
+                  "sentiment": "negative",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+                  "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart stock trades in the green for seven consecutive days",
+                  "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+                  "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "positive",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+                  "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+                  "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                }
+              ],
+              "investorSentiment": [
+                {
+                  "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+                  "url": "https://stocktwits.com/symbol/WMT/sentiment",
+                  "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+                  "source": "stocktwits.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+                  "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+                  "source": "seekingalpha.com",
+                  "sentiment": "negative",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+                  "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart stock trades in the green for seven consecutive days",
+                  "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+                  "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "positive",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+                  "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+                  "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                }
+              ],
+              "summary": {
+                "totalMentions": 10,
+                "socialPlatforms": [
+                  "stocktwits.com",
+                  "seekingalpha.com"
+                ],
+                "processedAt": "2025-06-06T13:18:24.304Z",
+                "daysCovered": 2
+              },
+              "metadata": {
+                "searchQueries": [
+                  "undefined undefined reddit discussion sentiment stock",
+                  "undefined stock price target opinion investor sentiment"
+                ],
+                "sources": [
+                  "stocktwits.com",
+                  "seekingalpha.com"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "Call Industry Research Agent": [
+      {
+        "json": {
+          "industryNews": [],
+          "summary": {
+            "totalArticles": 0,
+            "searchQuery": "",
+            "processedAt": "2025-06-06T13:18:26.524Z",
+            "daysCovered": 3
+          },
+          "metadata": {
+            "sources": [],
+            "dateRange": {
+              "from": "2025-06-03",
+              "to": "2025-06-06"
+            }
+          }
+        }
+      }
+    ],
+    "Aggregate1": [
+      {
+        "json": {
+          "data": [
+            {
+              "industryNews": [],
+              "summary": {
+                "totalArticles": 0,
+                "searchQuery": "",
+                "processedAt": "2025-06-06T13:18:26.524Z",
+                "daysCovered": 3
+              },
+              "metadata": {
+                "sources": [],
+                "dateRange": {
+                  "from": "2025-06-03",
+                  "to": "2025-06-06"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "Merge": [
+      {
+        "json": {
+          "debug": {
+            "totalInputs": 1,
+            "inputStatus": [
+              "exists"
+            ],
+            "hasMonetaryData": true,
+            "hasTradeData": true,
+            "hasIndustryData": true
+          },
+          "inputCount": 1,
+          "allInputs": [
+            {
+              "Meta Data": {
+                "1. Information": "Daily Prices (open, high, low, close) and Volumes",
+                "2. Symbol": "WMT",
+                "3. Last Refreshed": "2025-06-05",
+                "4. Output Size": "Compact",
+                "5. Time Zone": "US/Eastern"
+              },
+              "Time Series (Daily)": {
+                "2025-06-05": {
+                  "1. open": "99.2950",
+                  "2. high": "99.5900",
+                  "3. low": "97.6050",
+                  "4. close": "97.9600",
+                  "5. volume": "15825276"
+                },
+                "2025-06-04": {
+                  "1. open": "99.7900",
+                  "2. high": "100.1300",
+                  "3. low": "99.3200",
+                  "4. close": "99.3500",
+                  "5. volume": "11115649"
+                },
+                "2025-06-03": {
+                  "1. open": "99.5650",
+                  "2. high": "100.8900",
+                  "3. low": "98.5700",
+                  "4. close": "99.9800",
+                  "5. volume": "15598643"
+                },
+                "2025-06-02": {
+                  "1. open": "98.8400",
+                  "2. high": "99.9050",
+                  "3. low": "98.0500",
+                  "4. close": "99.7700",
+                  "5. volume": "16999205"
+                },
+                "2025-05-30": {
+                  "1. open": "96.9600",
+                  "2. high": "98.9300",
+                  "3. low": "96.6000",
+                  "4. close": "98.7200",
+                  "5. volume": "29980069"
+                },
+                "2025-05-29": {
+                  "1. open": "97.6300",
+                  "2. high": "97.7700",
+                  "3. low": "96.8509",
+                  "4. close": "97.1000",
+                  "5. volume": "14343738"
+                },
+                "2025-05-28": {
+                  "1. open": "97.5200",
+                  "2. high": "98.2400",
+                  "3. low": "97.0600",
+                  "4. close": "97.2400",
+                  "5. volume": "11220098"
+                },
+                "2025-05-27": {
+                  "1. open": "97.3000",
+                  "2. high": "97.7950",
+                  "3. low": "96.5800",
+                  "4. close": "97.5800",
+                  "5. volume": "17180937"
+                },
+                "2025-05-23": {
+                  "1. open": "95.3400",
+                  "2. high": "96.5400",
+                  "3. low": "95.0000",
+                  "4. close": "96.3400",
+                  "5. volume": "13668621"
+                },
+                "2025-05-22": {
+                  "1. open": "96.5400",
+                  "2. high": "96.9600",
+                  "3. low": "95.8150",
+                  "4. close": "95.9300",
+                  "5. volume": "13712163"
+                },
+                "2025-05-21": {
+                  "1. open": "97.1250",
+                  "2. high": "97.7556",
+                  "3. low": "95.9750",
+                  "4. close": "96.4300",
+                  "5. volume": "15742336"
+                },
+                "2025-05-20": {
+                  "1. open": "98.5550",
+                  "2. high": "98.8183",
+                  "3. low": "96.5200",
+                  "4. close": "97.8000",
+                  "5. volume": "15609610"
+                },
+                "2025-05-19": {
+                  "1. open": "96.6500",
+                  "2. high": "98.2800",
+                  "3. low": "95.8100",
+                  "4. close": "98.1200",
+                  "5. volume": "20041573"
+                },
+                "2025-05-16": {
+                  "1. open": "96.1400",
+                  "2. high": "99.1946",
+                  "3. low": "95.9950",
+                  "4. close": "98.2400",
+                  "5. volume": "33746187"
+                },
+                "2025-05-15": {
+                  "1. open": "94.3000",
+                  "2. high": "96.7200",
+                  "3. low": "91.8900",
+                  "4. close": "96.3500",
+                  "5. volume": "44026125"
+                },
+                "2025-05-14": {
+                  "1. open": "96.0250",
+                  "2. high": "97.3300",
+                  "3. low": "95.8300",
+                  "4. close": "96.8300",
+                  "5. volume": "25620110"
+                },
+                "2025-05-13": {
+                  "1. open": "96.5000",
+                  "2. high": "97.3200",
+                  "3. low": "95.2250",
+                  "4. close": "95.8800",
+                  "5. volume": "19746658"
+                },
+                "2025-05-12": {
+                  "1. open": "97.6700",
+                  "2. high": "97.9700",
+                  "3. low": "95.6200",
+                  "4. close": "96.7500",
+                  "5. volume": "26783925"
+                },
+                "2025-05-09": {
+                  "1. open": "96.7500",
+                  "2. high": "97.2000",
+                  "3. low": "96.2900",
+                  "4. close": "96.7200",
+                  "5. volume": "13697822"
+                },
+                "2025-05-08": {
+                  "1. open": "98.7500",
+                  "2. high": "99.3300",
+                  "3. low": "97.3550",
+                  "4. close": "97.4300",
+                  "5. volume": "14461119"
+                },
+                "2025-05-07": {
+                  "1. open": "98.5500",
+                  "2. high": "99.2308",
+                  "3. low": "98.3100",
+                  "4. close": "98.8300",
+                  "5. volume": "11310191"
+                },
+                "2025-05-06": {
+                  "1. open": "98.7400",
+                  "2. high": "99.4700",
+                  "3. low": "98.4100",
+                  "4. close": "98.5500",
+                  "5. volume": "10625999"
+                },
+                "2025-05-05": {
+                  "1. open": "98.9400",
+                  "2. high": "99.7400",
+                  "3. low": "98.5300",
+                  "4. close": "99.3300",
+                  "5. volume": "12439132"
+                },
+                "2025-05-02": {
+                  "1. open": "97.9500",
+                  "2. high": "99.2200",
+                  "3. low": "97.8500",
+                  "4. close": "98.7500",
+                  "5. volume": "16031373"
+                },
+                "2025-05-01": {
+                  "1. open": "97.0150",
+                  "2. high": "97.9000",
+                  "3. low": "96.5900",
+                  "4. close": "97.4100",
+                  "5. volume": "13171784"
+                },
+                "2025-04-30": {
+                  "1. open": "95.9400",
+                  "2. high": "97.7800",
+                  "3. low": "94.9300",
+                  "4. close": "97.2500",
+                  "5. volume": "21639860"
+                },
+                "2025-04-29": {
+                  "1. open": "94.8400",
+                  "2. high": "96.1800",
+                  "3. low": "94.4200",
+                  "4. close": "96.0400",
+                  "5. volume": "12679025"
+                },
+                "2025-04-28": {
+                  "1. open": "95.1000",
+                  "2. high": "96.0000",
+                  "3. low": "94.3400",
+                  "4. close": "95.2200",
+                  "5. volume": "12950000"
+                },
+                "2025-04-25": {
+                  "1. open": "95.8000",
+                  "2. high": "96.4700",
+                  "3. low": "94.3600",
+                  "4. close": "95.0900",
+                  "5. volume": "15317220"
+                },
+                "2025-04-24": {
+                  "1. open": "94.7100",
+                  "2. high": "96.2150",
+                  "3. low": "93.6601",
+                  "4. close": "95.8400",
+                  "5. volume": "13444528"
+                },
+                "2025-04-23": {
+                  "1. open": "95.0164",
+                  "2. high": "96.6000",
+                  "3. low": "94.1619",
+                  "4. close": "94.9600",
+                  "5. volume": "18046886"
+                },
+                "2025-04-22": {
+                  "1. open": "92.8800",
+                  "2. high": "95.2900",
+                  "3. low": "92.8800",
+                  "4. close": "94.8500",
+                  "5. volume": "15407774"
+                },
+                "2025-04-21": {
+                  "1. open": "93.0200",
+                  "2. high": "94.0800",
+                  "3. low": "91.3400",
+                  "4. close": "92.4100",
+                  "5. volume": "18361208"
+                },
+                "2025-04-17": {
+                  "1. open": "91.8300",
+                  "2. high": "93.8700",
+                  "3. low": "91.6200",
+                  "4. close": "93.2200",
+                  "5. volume": "21393917"
+                },
+                "2025-04-16": {
+                  "1. open": "94.0000",
+                  "2. high": "94.3000",
+                  "3. low": "90.6100",
+                  "4. close": "91.1900",
+                  "5. volume": "22229105"
+                },
+                "2025-04-15": {
+                  "1. open": "94.8200",
+                  "2. high": "96.0300",
+                  "3. low": "93.8700",
+                  "4. close": "93.9700",
+                  "5. volume": "21871213"
+                },
+                "2025-04-14": {
+                  "1. open": "93.2700",
+                  "2. high": "95.4400",
+                  "3. low": "92.9000",
+                  "4. close": "94.7300",
+                  "5. volume": "27742915"
+                },
+                "2025-04-11": {
+                  "1. open": "90.6800",
+                  "2. high": "93.3500",
+                  "3. low": "90.0100",
+                  "4. close": "92.8000",
+                  "5. volume": "25508136"
+                },
+                "2025-04-10": {
+                  "1. open": "88.7300",
+                  "2. high": "91.8700",
+                  "3. low": "88.1634",
+                  "4. close": "90.6100",
+                  "5. volume": "34735323"
+                },
+                "2025-04-09": {
+                  "1. open": "83.3250",
+                  "2. high": "90.8000",
+                  "3. low": "83.0200",
+                  "4. close": "89.6000",
+                  "5. volume": "46632755"
+                },
+                "2025-04-08": {
+                  "1. open": "85.8500",
+                  "2. high": "86.9650",
+                  "3. low": "81.0300",
+                  "4. close": "81.7900",
+                  "5. volume": "34351744"
+                },
+                "2025-04-07": {
+                  "1. open": "80.2400",
+                  "2. high": "86.2600",
+                  "3. low": "79.8100",
+                  "4. close": "83.8300",
+                  "5. volume": "36884944"
+                },
+                "2025-04-04": {
+                  "1. open": "85.6400",
+                  "2. high": "87.3900",
+                  "3. low": "82.6500",
+                  "4. close": "83.1900",
+                  "5. volume": "36209015"
+                },
+                "2025-04-03": {
+                  "1. open": "86.2800",
+                  "2. high": "89.8800",
+                  "3. low": "86.2800",
+                  "4. close": "87.2600",
+                  "5. volume": "33012927"
+                },
+                "2025-04-02": {
+                  "1. open": "88.2000",
+                  "2. high": "90.1450",
+                  "3. low": "88.1175",
+                  "4. close": "89.7600",
+                  "5. volume": "19384137"
+                },
+                "2025-04-01": {
+                  "1. open": "87.5350",
+                  "2. high": "89.1100",
+                  "3. low": "87.3700",
+                  "4. close": "88.8300",
+                  "5. volume": "22080252"
+                },
+                "2025-03-31": {
+                  "1. open": "84.7600",
+                  "2. high": "88.2000",
+                  "3. low": "84.3700",
+                  "4. close": "87.7900",
+                  "5. volume": "30269313"
+                },
+                "2025-03-28": {
+                  "1. open": "85.4300",
+                  "2. high": "85.8300",
+                  "3. low": "84.7000",
+                  "4. close": "85.1500",
+                  "5. volume": "14790567"
+                },
+                "2025-03-27": {
+                  "1. open": "84.7750",
+                  "2. high": "86.1100",
+                  "3. low": "84.7750",
+                  "4. close": "85.6300",
+                  "5. volume": "16782807"
+                },
+                "2025-03-26": {
+                  "1. open": "85.1900",
+                  "2. high": "85.5600",
+                  "3. low": "84.5700",
+                  "4. close": "85.2100",
+                  "5. volume": "27241495"
+                },
+                "2025-03-25": {
+                  "1. open": "86.7600",
+                  "2. high": "87.3050",
+                  "3. low": "84.6200",
+                  "4. close": "84.7600",
+                  "5. volume": "27908573"
+                },
+                "2025-03-24": {
+                  "1. open": "86.4700",
+                  "2. high": "87.6500",
+                  "3. low": "86.3500",
+                  "4. close": "87.4900",
+                  "5. volume": "17900732"
+                },
+                "2025-03-21": {
+                  "1. open": "85.2800",
+                  "2. high": "86.2300",
+                  "3. low": "84.7800",
+                  "4. close": "85.9800",
+                  "5. volume": "26797178"
+                },
+                "2025-03-20": {
+                  "1. open": "85.8100",
+                  "2. high": "87.0800",
+                  "3. low": "85.5150",
+                  "4. close": "85.8100",
+                  "5. volume": "18185506"
+                },
+                "2025-03-19": {
+                  "1. open": "85.9500",
+                  "2. high": "86.7850",
+                  "3. low": "85.6200",
+                  "4. close": "86.3300",
+                  "5. volume": "24555857"
+                },
+                "2025-03-18": {
+                  "1. open": "87.4400",
+                  "2. high": "87.6750",
+                  "3. low": "85.5000",
+                  "4. close": "85.5900",
+                  "5. volume": "17850930"
+                },
+                "2025-03-17": {
+                  "1. open": "85.1300",
+                  "2. high": "87.9850",
+                  "3. low": "84.9800",
+                  "4. close": "87.4600",
+                  "5. volume": "26297768"
+                },
+                "2025-03-14": {
+                  "1. open": "84.9600",
+                  "2. high": "85.3700",
+                  "3. low": "84.0600",
+                  "4. close": "85.3500",
+                  "5. volume": "35500647"
+                },
+                "2025-03-13": {
+                  "1. open": "84.9400",
+                  "2. high": "85.4500",
+                  "3. low": "83.8700",
+                  "4. close": "84.5000",
+                  "5. volume": "31507753"
+                },
+                "2025-03-12": {
+                  "1. open": "87.8800",
+                  "2. high": "89.1000",
+                  "3. low": "84.8800",
+                  "4. close": "85.2000",
+                  "5. volume": "33301609"
+                },
+                "2025-03-11": {
+                  "1. open": "87.2900",
+                  "2. high": "89.3450",
+                  "3. low": "87.1400",
+                  "4. close": "87.4400",
+                  "5. volume": "28687586"
+                },
+                "2025-03-10": {
+                  "1. open": "89.7600",
+                  "2. high": "90.2300",
+                  "3. low": "86.6100",
+                  "4. close": "87.8200",
+                  "5. volume": "35029553"
+                },
+                "2025-03-07": {
+                  "1. open": "93.9400",
+                  "2. high": "93.9500",
+                  "3. low": "90.7600",
+                  "4. close": "91.7200",
+                  "5. volume": "35913156"
+                },
+                "2025-03-06": {
+                  "1. open": "94.8000",
+                  "2. high": "96.1900",
+                  "3. low": "94.1833",
+                  "4. close": "94.6400",
+                  "5. volume": "19957804"
+                },
+                "2025-03-05": {
+                  "1. open": "94.9700",
+                  "2. high": "96.3900",
+                  "3. low": "94.7500",
+                  "4. close": "95.9800",
+                  "5. volume": "17638956"
+                },
+                "2025-03-04": {
+                  "1. open": "95.7600",
+                  "2. high": "97.0500",
+                  "3. low": "94.4600",
+                  "4. close": "94.9700",
+                  "5. volume": "25227673"
+                },
+                "2025-03-03": {
+                  "1. open": "97.9800",
+                  "2. high": "99.4900",
+                  "3. low": "96.8250",
+                  "4. close": "97.5900",
+                  "5. volume": "18372193"
+                },
+                "2025-02-28": {
+                  "1. open": "97.7900",
+                  "2. high": "98.8600",
+                  "3. low": "97.1700",
+                  "4. close": "98.6100",
+                  "5. volume": "25451260"
+                },
+                "2025-02-27": {
+                  "1. open": "95.9000",
+                  "2. high": "98.0399",
+                  "3. low": "95.8092",
+                  "4. close": "96.7900",
+                  "5. volume": "16431469"
+                },
+                "2025-02-26": {
+                  "1. open": "97.7000",
+                  "2. high": "98.7250",
+                  "3. low": "96.0700",
+                  "4. close": "96.2000",
+                  "5. volume": "19069721"
+                },
+                "2025-02-25": {
+                  "1. open": "94.3500",
+                  "2. high": "97.9100",
+                  "3. low": "94.2400",
+                  "4. close": "97.6900",
+                  "5. volume": "29331188"
+                },
+                "2025-02-24": {
+                  "1. open": "94.1800",
+                  "2. high": "94.6400",
+                  "3. low": "92.1200",
+                  "4. close": "93.6700",
+                  "5. volume": "29755875"
+                },
+                "2025-02-21": {
+                  "1. open": "96.5300",
+                  "2. high": "96.8500",
+                  "3. low": "94.1150",
+                  "4. close": "94.7800",
+                  "5. volume": "35014806"
+                },
+                "2025-02-20": {
+                  "1. open": "98.7800",
+                  "2. high": "100.1200",
+                  "3. low": "96.6808",
+                  "4. close": "97.2100",
+                  "5. volume": "55450924"
+                },
+                "2025-02-19": {
+                  "1. open": "103.8500",
+                  "2. high": "104.2000",
+                  "3. low": "102.5500",
+                  "4. close": "104.0000",
+                  "5. volume": "18507981"
+                },
+                "2025-02-18": {
+                  "1. open": "103.7200",
+                  "2. high": "103.9900",
+                  "3. low": "102.5100",
+                  "4. close": "103.7800",
+                  "5. volume": "18247314"
+                },
+                "2025-02-14": {
+                  "1. open": "105.3000",
+                  "2. high": "105.3000",
+                  "3. low": "103.6000",
+                  "4. close": "104.0400",
+                  "5. volume": "14109460"
+                },
+                "2025-02-13": {
+                  "1. open": "104.0000",
+                  "2. high": "105.2400",
+                  "3. low": "103.5300",
+                  "4. close": "105.0500",
+                  "5. volume": "12604413"
+                },
+                "2025-02-12": {
+                  "1. open": "102.1200",
+                  "2. high": "103.9000",
+                  "3. low": "102.0400",
+                  "4. close": "103.6100",
+                  "5. volume": "15162125"
+                },
+                "2025-02-11": {
+                  "1. open": "102.6200",
+                  "2. high": "102.8500",
+                  "3. low": "101.8500",
+                  "4. close": "102.4700",
+                  "5. volume": "11953632"
+                },
+                "2025-02-10": {
+                  "1. open": "101.9500",
+                  "2. high": "102.9300",
+                  "3. low": "101.2500",
+                  "4. close": "102.9200",
+                  "5. volume": "15274644"
+                },
+                "2025-02-07": {
+                  "1. open": "103.0000",
+                  "2. high": "103.1100",
+                  "3. low": "101.1100",
+                  "4. close": "101.1500",
+                  "5. volume": "12451072"
+                },
+                "2025-02-06": {
+                  "1. open": "102.5300",
+                  "2. high": "103.0200",
+                  "3. low": "101.9400",
+                  "4. close": "102.8500",
+                  "5. volume": "13088467"
+                },
+                "2025-02-05": {
+                  "1. open": "100.6500",
+                  "2. high": "102.5800",
+                  "3. low": "100.5400",
+                  "4. close": "102.4600",
+                  "5. volume": "15926717"
+                },
+                "2025-02-04": {
+                  "1. open": "99.9700",
+                  "2. high": "100.9500",
+                  "3. low": "99.6900",
+                  "4. close": "100.7700",
+                  "5. volume": "15201194"
+                },
+                "2025-02-03": {
+                  "1. open": "96.7700",
+                  "2. high": "99.7900",
+                  "3. low": "96.4700",
+                  "4. close": "99.5400",
+                  "5. volume": "20484152"
+                },
+                "2025-01-31": {
+                  "1. open": "99.0000",
+                  "2. high": "99.0000",
+                  "3. low": "97.7000",
+                  "4. close": "98.1600",
+                  "5. volume": "16413893"
+                },
+                "2025-01-30": {
+                  "1. open": "97.6900",
+                  "2. high": "98.9300",
+                  "3. low": "97.4200",
+                  "4. close": "98.6500",
+                  "5. volume": "11012220"
+                },
+                "2025-01-29": {
+                  "1. open": "97.4250",
+                  "2. high": "98.1700",
+                  "3. low": "97.2200",
+                  "4. close": "97.5000",
+                  "5. volume": "11261444"
+                },
+                "2025-01-28": {
+                  "1. open": "97.2300",
+                  "2. high": "97.8400",
+                  "3. low": "96.7251",
+                  "4. close": "97.2900",
+                  "5. volume": "14641621"
+                },
+                "2025-01-27": {
+                  "1. open": "95.9000",
+                  "2. high": "97.4600",
+                  "3. low": "94.8200",
+                  "4. close": "97.4000",
+                  "5. volume": "18880614"
+                },
+                "2025-01-24": {
+                  "1. open": "93.5400",
+                  "2. high": "95.0100",
+                  "3. low": "93.4550",
+                  "4. close": "94.7600",
+                  "5. volume": "14973773"
+                },
+                "2025-01-23": {
+                  "1. open": "92.9600",
+                  "2. high": "93.8100",
+                  "3. low": "92.3200",
+                  "4. close": "93.8100",
+                  "5. volume": "14198438"
+                },
+                "2025-01-22": {
+                  "1. open": "93.7700",
+                  "2. high": "94.0000",
+                  "3. low": "92.5200",
+                  "4. close": "93.2300",
+                  "5. volume": "15567057"
+                },
+                "2025-01-21": {
+                  "1. open": "92.4800",
+                  "2. high": "94.2400",
+                  "3. low": "92.3100",
+                  "4. close": "93.0800",
+                  "5. volume": "23247451"
+                },
+                "2025-01-17": {
+                  "1. open": "92.0700",
+                  "2. high": "92.2600",
+                  "3. low": "91.0500",
+                  "4. close": "91.9400",
+                  "5. volume": "15868213"
+                },
+                "2025-01-16": {
+                  "1. open": "91.5000",
+                  "2. high": "91.7200",
+                  "3. low": "90.1200",
+                  "4. close": "91.3000",
+                  "5. volume": "13267723"
+                },
+                "2025-01-15": {
+                  "1. open": "91.0650",
+                  "2. high": "91.7250",
+                  "3. low": "90.8100",
+                  "4. close": "91.3400",
+                  "5. volume": "17348174"
+                },
+                "2025-01-14": {
+                  "1. open": "91.8600",
+                  "2. high": "91.9800",
+                  "3. low": "90.5650",
+                  "4. close": "90.7900",
+                  "5. volume": "13549159"
+                },
+                "2025-01-13": {
+                  "1. open": "92.1200",
+                  "2. high": "92.4300",
+                  "3. low": "91.1000",
+                  "4. close": "91.5300",
+                  "5. volume": "18617077"
+                }
+              }
+            }
+          ],
+          "primaryCompany": {
+            "type": "primary",
+            "articles": []
+          },
+          "competitors": [],
+          "secFilings": {
+            "type": "sec_filings",
+            "filings": [
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016810/0001127602-25-016810-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016791/0001127602-25-016791-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016787/0001127602-25-016787-index.html"
+              },
+              {
+                "form": "4",
+                "filingDate": "2025-06-04",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000112760225016780/0001127602-25-016780-index.html"
+              },
+              {
+                "form": "144",
+                "filingDate": "2025-06-02",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000195824425003131/0001958244-25-003131-index.html"
+              },
+              {
+                "form": "144",
+                "filingDate": "2025-06-02",
+                "url": "https://www.sec.gov/Archives/edgar/data/0000104169/000196858225000434/0001968582-25-000434-index.html"
+              }
+            ]
+          },
+          "summary": {
+            "primaryArticles": 0,
+            "competitorArticles": 0,
+            "secFilings": 6,
+            "processedAt": "2025-06-06T13:15:12.840Z",
+            "totalArticles": 3,
+            "articlesByCategory": {
+              "monetaryPolicy": 3,
+              "tradeAndGlobal": 0,
+              "industryPolicy": 0
+            },
+            "sources": [
+              "www.wsj.com",
+              "www.bloomberg.com"
+            ],
+            "daysCovered": 4
+          },
+          "type": "macroeconomic_analysis",
+          "overallEnvironment": "supportive",
+          "impactAssessment": {
+            "supportive": 1,
+            "challenging": 0,
+            "mixed": 0,
+            "neutral": 2
+          },
+          "keyThemes": [],
+          "categorizedArticles": {
+            "monetaryPolicy": [
+              {
+                "title": "Kohl's, Gap, Best Buy and More Retailers Say Tariff Court Rulings Don't ...",
+                "url": "https://www.wsj.com/business/retail/trump-tariff-court-ruling-kohls-best-buy-20cb2708",
+                "snippet": "WSJ's Asia economics reporter explains how markets have reacted after a federal trade court struck down President Trump's sweeping tariffs and the implications for international trade....",
+                "source": "www.wsj.com",
+                "impact": "neutral",
+                "category": "monetary_policy"
+              },
+              {
+                "title": "Finance and Markets - WSJ.com - The Wall Street Journal",
+                "url": "https://www.wsj.com/finance",
+                "snippet": "The latest finance and stock market news covering the Dow, S&P 500, banking, investing and regulation....",
+                "source": "www.wsj.com",
+                "impact": "neutral",
+                "category": "monetary_policy"
+              },
+              {
+                "title": "US Consumers Hit the Brakes While Goods Imports Sink by a Record",
+                "url": "https://www.bloomberg.com/news/articles/2025-05-30/us-consumer-spending-growth-slows-while-inflation-remains-soft",
+                "snippet": "US Consumers Hit the Brakes While Goods Imports Sink by a Record - Bloomberg Bloomberg *   [Bloomberg Anywhere Remote Login](https://bba.bloomberg.net/?utm_source=bloomberg-menu&utm_medium=bcom) *   [...",
+                "source": "www.bloomberg.com",
+                "impact": "supportive",
+                "category": "monetary_policy"
+              }
+            ],
+            "tradeAndGlobal": [],
+            "industryPolicy": []
+          },
+          "allArticles": [
+            {
+              "title": "Kohl's, Gap, Best Buy and More Retailers Say Tariff Court Rulings Don't ...",
+              "url": "https://www.wsj.com/business/retail/trump-tariff-court-ruling-kohls-best-buy-20cb2708",
+              "snippet": "WSJ's Asia economics reporter explains how markets have reacted after a federal trade court struck down President Trump's sweeping tariffs and the implications for international trade....",
+              "source": "www.wsj.com",
+              "impact": "neutral",
+              "category": "monetary_policy"
+            },
+            {
+              "title": "Finance and Markets - WSJ.com - The Wall Street Journal",
+              "url": "https://www.wsj.com/finance",
+              "snippet": "The latest finance and stock market news covering the Dow, S&P 500, banking, investing and regulation....",
+              "source": "www.wsj.com",
+              "impact": "neutral",
+              "category": "monetary_policy"
+            },
+            {
+              "title": "US Consumers Hit the Brakes While Goods Imports Sink by a Record",
+              "url": "https://www.bloomberg.com/news/articles/2025-05-30/us-consumer-spending-growth-slows-while-inflation-remains-soft",
+              "snippet": "US Consumers Hit the Brakes While Goods Imports Sink by a Record - Bloomberg Bloomberg *   [Bloomberg Anywhere Remote Login](https://bba.bloomberg.net/?utm_source=bloomberg-menu&utm_medium=bcom) *   [...",
+              "source": "www.bloomberg.com",
+              "impact": "supportive",
+              "category": "monetary_policy"
+            }
+          ],
+          "metadata": {
+            "searchQueries": [
+              "Federal Reserve interest rates inflation economic policy",
+              "trade policy tariffs supply chain global economy",
+              "undefined industry economic impact regulation government policy"
+            ],
+            "targetSources": [
+              "reuters.com",
+              "bloomberg.com",
+              "wsj.com",
+              "ft.com",
+              "cnbc.com",
+              "federalreserve.gov"
+            ]
+          },
+          "data": [
+            {
+              "type": "social_media_analysis",
+              "overallSentiment": "neutral",
+              "sentimentBreakdown": {
+                "positive": "20%",
+                "negative": "20%",
+                "neutral": "60%"
+              },
+              "keyTopics": [
+                "stock",
+                "price",
+                "target",
+                "buy",
+                "downgrade"
+              ],
+              "socialMentions": [
+                {
+                  "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+                  "url": "https://stocktwits.com/symbol/WMT/sentiment",
+                  "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+                  "source": "stocktwits.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+                  "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+                  "source": "seekingalpha.com",
+                  "sentiment": "negative",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+                  "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart stock trades in the green for seven consecutive days",
+                  "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+                  "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "positive",
+                  "type": "social_mention"
+                },
+                {
+                  "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+                  "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+                  "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "social_mention"
+                }
+              ],
+              "investorSentiment": [
+                {
+                  "title": "Walmart Inc (WMT) sentiment score, message volume, participation score ...",
+                  "url": "https://stocktwits.com/symbol/WMT/sentiment",
+                  "snippet": "Discover Walmart Inc (WMT) market and community sentiment, movement in message volume, participation score and buzz level in the Stocktwits community. Discover Walmart Inc (WMT) market and community s...",
+                  "source": "stocktwits.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart: Simply Too Expensive (Rating Downgrade) (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4717837-walmart-stock-simply-too-expensive-rating-downgrade",
+                  "snippet": "To be honest, I haven't had much of a bullish or bearish opinion on the stock in 2023-24. My last WMT article was a Buy rating in November 2021 here when the price was under $50....",
+                  "source": "seekingalpha.com",
+                  "sentiment": "negative",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart Stock: I Can't Wait To Buy It, But I Need To (NYSE:WMT)",
+                  "url": "https://seekingalpha.com/article/4769929-walmart-stock-must-wait-to-buy",
+                  "snippet": "As I mentioned in the last analysis of Walmart (NYSE:WMT), a 10% drop could be a buying opportunity.WMT stock is down 9% since then. The stock was around $94 then, and closed last Friday at just...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart stock trades in the green for seven consecutive days",
+                  "url": "https://seekingalpha.com/news/4368647-walmart-stock-trades-in-the-green-for-seven-consecutive-days",
+                  "snippet": "Walmart (NYSE:WMT) shares traded in the green on Thursday, making it the seventh consecutive day of gains.The stock closed up 0.90% at $95.30. WMT rose 84% in the last 12 months. YTD, the stock is...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "positive",
+                  "type": "investor_sentiment"
+                },
+                {
+                  "title": "Walmart Inc. (WMT) Stock Forecast, Price Target, and Price Chart ...",
+                  "url": "https://seekingalpha.com/symbol/WMT/ratings/sell-side-ratings",
+                  "snippet": "Get detailed forecast and price target charts for Walmart Inc. stock on Seeking Alpha. Click here to see the forecast for WMT stock...",
+                  "source": "seekingalpha.com",
+                  "sentiment": "neutral",
+                  "type": "investor_sentiment"
+                }
+              ],
+              "summary": {
+                "totalMentions": 10,
+                "socialPlatforms": [
+                  "stocktwits.com",
+                  "seekingalpha.com"
+                ],
+                "processedAt": "2025-06-06T13:18:26.524Z",
+                "daysCovered": 3,
+                "totalArticles": 0,
+                "searchQuery": ""
+              },
+              "metadata": {
+                "searchQueries": [
+                  "undefined undefined reddit discussion sentiment stock",
+                  "undefined stock price target opinion investor sentiment"
+                ],
+                "sources": [
+                  "stocktwits.com",
+                  "seekingalpha.com"
+                ],
+                "dateRange": {
+                  "from": "2025-06-03",
+                  "to": "2025-06-06"
+                }
+              },
+              "industryNews": []
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Daily Schedule (6:00 AM PST)": {
+      "main": [
+        []
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Simulate Google Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Company List": {
+      "main": [
+        []
+      ]
+    },
+    "Process Company List": {
+      "main": [
+        [
+          {
+            "node": "Split out Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Refinement": {
+      "main": [
+        [
+          {
+            "node": "Call Refinement Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Refinement Agent": {
+      "main": [
+        [
+          {
+            "node": "Store Company Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Company Report": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Compile All Reports",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Compile All Reports": {
+      "main": [
+        [
+          {
+            "node": "Call Delivery Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Delivery Agent": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Stock Price Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out Companies": {
+      "main": [
+        [
+          {
+            "node": "Transform Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Company & Competitor Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Call Industry Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Macroeconomic Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Call Social Media Agent": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Insight Generation Agent1": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Refinement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Summarisation Agent": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Refinement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Company Data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Call Stock Price Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Company & Competitor Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Industry Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Social Media Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Macroeconomic Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine": {
+      "main": [
+        [
+          {
+            "node": "Call Summarisation Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call Insight Generation Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Debug Set Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Simulate Google Data": {
+      "main": [
+        [
+          {
+            "node": "Process Company List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Combine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Set Node": {
+      "main": [
+        [
+          {
+            "node": "Parse Debug JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Debug JSON": {
+      "main": [
+        [
+          {
+            "node": "Summary Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Builder": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fab03666-2b4d-4b80-9093-63f18098d3ce",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d735d77f21fd4aef6b73e3673b1ecc97bb1c1f558cf83cdb9413cefd83cbd75c"
+  },
+  "id": "WBstmXznfaOPox9i",
+  "tags": [
+    {
+      "createdAt": "2025-05-22T21:33:08.661Z",
+      "updatedAt": "2025-05-22T21:33:08.661Z",
+      "id": "O2FerL4GKq0z4Mcn",
+      "name": "JSS"
+    },
+    {
+      "createdAt": "2025-05-26T21:26:05.460Z",
+      "updatedAt": "2025-05-26T21:26:05.460Z",
+      "id": "ZqSmdDn7kllsb9e4",
+      "name": "IR"
+    }
+  ]
+}
