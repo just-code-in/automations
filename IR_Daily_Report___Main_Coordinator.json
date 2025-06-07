@@ -654,19 +654,19 @@
             {
               "id": "d0c03cf6-6dc4-4284-afce-d8b61f5bbfba",
               "name": "=companyResearch",
-              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const primary = debug.primaryCompany?.articles || [];     return primary.length ? primary.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
+              "value": "={{(() => {   try {     const debug = $json;     const primary = debug.primaryCompany?.articles || [];     return primary.length ? primary.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
               "type": "string"
             },
             {
               "id": "21ab2df0-5e04-4349-af5d-6c3b3de65329",
               "name": "=industryReserach",
-              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const industry = debug.industryNews || [];     return industry.length ? industry.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
+              "value": "={{(() => {   try {     const debug = $json;     const industry = debug.industryNews || [];     return industry.length ? industry.map(a => `- ${a.title}`).join('\\n') : null;   } catch (e) {     return null;   } })()}}",
               "type": "string"
             },
             {
               "id": "93b24d6f-3a83-4730-9e17-08bae929518b",
               "name": "=socialMedia",
-              "value": "={{(() => {   try {     const debug = JSON.parse($json.debug);     const social = debug.data?.find(d => d.type === 'social_media_analysis');     const mentions = social?.socialMentions || [];     return mentions.map(m => `- ${m.title} (${m.sentiment})`).join('\\n') || null;   } catch (e) {     return null;   } })()}}",
+              "value": "={{(() => {   try {     const debug = $json;     const social = debug.data?.find(d => d.type === 'social_media_analysis');     const mentions = social?.socialMentions || [];     return mentions.map(m => `- ${m.title} (${m.sentiment})`).join('\\n') || null;   } catch (e) {     return null;   } })()}}",
               "type": "string"
             },
             {
@@ -678,7 +678,7 @@
             {
               "id": "bf323993-79a4-45d2-ac22-429213bb6b48",
               "name": "stockPrice",
-              "value": "={{(() => {\n  try {\n    const parsed = JSON.parse($json.debug);\n    const timeSeries = parsed.debug?.allInputs?.[0]?.[\"Time Series (Daily)\"];\n    if (!timeSeries) return \"No time series data found.\";\n    const latestDate = Object.keys(timeSeries).sort().reverse()[0];\n    const closePrice = timeSeries[latestDate]?.[\"4. close\"];\n    return closePrice\n      ? `$${parseFloat(closePrice).toFixed(2)} (as of ${latestDate})`\n      : \"No close price.\";\n  } catch (e) {\n    return `Error parsing JSON: ${e.message}`;\n  }\n})()}}\n\n\n\n",
+              "value": "={{(() => {\n  try {\n    const parsed = $json;\n    const timeSeries = parsed.debug?.allInputs?.[0]?.[\"Time Series (Daily)\"];\n    if (!timeSeries) return \"No time series data found.\";\n    const latestDate = Object.keys(timeSeries).sort().reverse()[0];\n    const closePrice = timeSeries[latestDate]?.[\"4. close\"];\n    return closePrice\n      ? `$${parseFloat(closePrice).toFixed(2)} (as of ${latestDate})`\n      : \"No close price.\";\n  } catch (e) {\n    return `Error parsing JSON: ${e.message}`;\n  }\n})()}}\n\n\n\n",
               "type": "string"
             }
           ]
