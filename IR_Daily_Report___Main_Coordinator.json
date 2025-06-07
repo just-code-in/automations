@@ -597,42 +597,6 @@
         "assignments": {
           "assignments": [
             {
-              "id": "5222305c-0eba-4628-984d-a5fa840f369f",
-              "name": "=debug",
-              "value": "={{ $json }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1580,
-        -320
-      ],
-      "id": "aeb79311-ec70-472c-b341-0526ea8deaa6",
-      "name": "Debug Set Node"
-    },
-    {
-      "parameters": {
-        "jsCode": "// This node parses the nested JSON string into real JSON so downstream nodes can access the structure.\nreturn $input.all().map(item => {\n  const parsed = JSON.parse(item.json.debug);\n  return {\n    json: parsed,\n  };\n});\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1780,
-        -320
-      ],
-      "id": "b1b956ac-f9fd-4788-975b-f22182e562c6",
-      "name": "Parse Debug JSON"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
               "id": "60e307fc-2734-443c-9485-5b63feb6f0e5",
               "name": "=macroeconomic",
               "value": "={{(() => {\n  try {\n    const macro = $json.debug.data?.find(d => d.type === 'macroeconomic_analysis');\n    const articles = macro?.categorizedArticles?.monetaryPolicy || [];\n    return articles.map(a => `- ${a.title} (${a.impact})`).join('\\n') || null;\n  } catch (e) {\n    return null;\n  }\n})()}}\n\n",
@@ -3134,7 +3098,7 @@
       "main": [
         [
           {
-            "node": "Debug Set Node",
+            "node": "Summary Builder",
             "type": "main",
             "index": 0
           }
@@ -3174,22 +3138,6 @@
         ]
       ]
     },
-    "Debug Set Node": {
-      "main": [
-        [
-          {
-            "node": "Parse Debug JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Debug JSON": {
-      "main": [
-        [
-          {
-            "node": "Summary Builder",
             "type": "main",
             "index": 0
           }
