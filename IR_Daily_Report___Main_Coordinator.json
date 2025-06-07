@@ -594,19 +594,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect all agent results\nconst allInputs = $input.all();\n\nlet combinedResults = {\n  ticker: null,\n  stockPrice: null,\n  companyResearch: null,\n  industryResearch: null,\n  socialMedia: null,\n  macroeconomic: null,\n  metadata: {\n    processedAt: new Date().toISOString(),\n    totalAgents: allInputs.length\n  }\n};\n\nallInputs.forEach((input, index) => {\n  const data = input.json;\n\n  // Try to extract the ticker if available\n  if (data.ticker && !combinedResults.ticker) {\n    combinedResults.ticker = data.ticker;\n  }\n\n  // Detect Stock Price Agent\n  if (data.stockData && Array.isArray(data.stockData) && data.stockData[0]?.dailyPrices) {\n    combinedResults.stockPrice = data;\n  }\n\n  // Detect Company Research Agent\n  else if (data.companyNews && data.competitorNews && data.secFilings) {\n    combinedResults.companyResearch = data;\n  }\n\n  // Detect Industry Research Agent\n  else if (data.industryNews && data.summary && typeof data.summary.totalArticles === 'number') {\n    combinedResults.industryResearch = data;\n  }\n\n  // Detect Social Media Agent (looser match)\n  else if (data.summary && typeof data.summary.totalMentions === 'number') {\n    combinedResults.socialMedia = data;\n  }\n\n  // Detect Macroeconomic Agent\n  else if (\n    data.overallEnvironment &&\n    data.impactAssessment &&\n    data.summary &&\n    typeof data.summary.totalArticles === 'number'\n  ) {\n    combinedResults.macroeconomic = data;\n  }\n\n  // If unknown\n  else {\n    console.log(`Agent ${index + 1} not matched. Keys:`, Object.keys(data));\n  }\n});\n\nreturn combinedResults;\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2740,
-        -320
-      ],
-      "id": "8be5b9c1-f1b3-49b0-a220-1456741ddbf1",
-      "name": "Merge1"
-    },
-    {
-      "parameters": {
         "assignments": {
           "assignments": [
             {
@@ -3151,11 +3138,6 @@
         ]
       ]
     },
-    "Merge1": {
-      "main": [
-        [
-          {
-            "node": "Combine",
             "type": "main",
             "index": 0
           }
@@ -3166,7 +3148,7 @@
       "main": [
         [
           {
-            "node": "Merge1",
+            "node": "Combine",
             "type": "main",
             "index": 0
           }
