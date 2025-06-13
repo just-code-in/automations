@@ -1,0 +1,672 @@
+{
+  "name": "Company & Competitor Research AgentV2",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.Name }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ $now.minus({hours: 72}).toISO().split('T')[0] }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $now.toISO().split('T')[0] }}"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "pageSize",
+              "value": "3"
+            },
+            {
+              "name": "apiKey",
+              "value": "82e1041833df46738ba74354c891fdf7"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        -160
+      ],
+      "id": "5827d55d-5930-4126-b8be-42674f21fc6c",
+      "name": "Company News"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split Competitors Node - handle coordinator format\nconst input = $input.first().json;\n\n// Handle both formats: \"Competitors\" (test) and \"competitors\" (coordinator)\nconst competitorsString = input.Competitors || input.competitors;\nconst symbol = input.Symbol || input.ticker;\n\nif (!competitorsString) {\n  throw new Error(`No competitors field found. Available fields: ${Object.keys(input).join(', ')}`);\n}\n\nconst competitors = competitorsString.split(',').map(c => c.trim());\n\nconst results = [\n  // Company search\n  {\n    searchType: \"company\",\n    ticker: symbol,\n    query: symbol,\n    originalData: input\n  }\n];\n\n// Add each competitor separately with unique identifiers\ncompetitors.forEach((competitor, index) => {\n  results.push({\n    searchType: \"competitor\",\n    competitorNumber: index + 1,  // 1, 2, 3, etc.\n    ticker: symbol,\n    competitor: competitor,\n    query: competitor,\n    originalData: input\n  });\n});\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        60,
+        0
+      ],
+      "id": "a0f2ba10-56c6-424f-87ff-d009b45c5aaa",
+      "name": "Split Symbols"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fixed symbol split - handle coordinator format\nconst input = $input.first().json;\n\n// Handle both test and coordinator formats\nconst competitorsString = input.originalData?.Competitors || input.originalData?.competitors;\nconst symbol = input.originalData?.Symbol || input.originalData?.ticker;\n\nif (!competitorsString) {\n  console.log('Available originalData keys:', Object.keys(input.originalData || {}));\n  throw new Error(`No competitors field in originalData. Available: ${Object.keys(input.originalData || {}).join(', ')}`);\n}\n\nconst competitors = competitorsString.split(',').map(c => c.trim());\n\nreturn [\n  { symbol: symbol, type: \"company\" },\n  { symbol: competitors[0], type: \"competitor1\" },\n  { symbol: competitors[1], type: \"competitor2\" }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "60c0023d-e048-4578-8631-96444d9681f4",
+      "name": "Break into 3"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "company",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "da22de60-c322-4e37-9054-9bee7b632920"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Company"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "39030a31-4c90-4b0f-8870-0b9a061a9895",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "competitor1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Competitor1"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9160e4a9-1ece-4e69-a1aa-a35d91a108c1",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "competitor2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Competitor2"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        380,
+        0
+      ],
+      "id": "28a66005-5082-49f0-866f-542b33a0048f",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.Symbol }} AND {{ $json.Name }} AND (stock OR earnings OR financial OR revenue OR shares OR analyst OR market OR \"stock price\")"
+            },
+            {
+              "name": "from",
+              "value": "=from: {{ $now.minus({days: 7}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $now.toISO().split('T')[0] }}"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "pageSize",
+              "value": "=2"
+            },
+            {
+              "name": "apiKey",
+              "value": "82e1041833df46738ba74354c891fdf7"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        0
+      ],
+      "id": "09626d95-3067-4497-bf68-69de38c3193d",
+      "name": "Competitor1 News"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "OVERVIEW"
+            },
+            {
+              "name": "symbol",
+              "value": "={{ $json.symbol }}"
+            },
+            {
+              "name": "apikey",
+              "value": "0LXKHUKDX1ZD42DD"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        -160
+      ],
+      "id": "9f160eac-4f4f-4352-ad55-2565a78dfae1",
+      "name": "Overview1"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "OVERVIEW"
+            },
+            {
+              "name": "symbol",
+              "value": "={{ $json.symbol }}"
+            },
+            {
+              "name": "apikey",
+              "value": "0LXKHUKDX1ZD42DD"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        0
+      ],
+      "id": "6ca5880c-de66-4028-b7d9-64797d983686",
+      "name": "Overview2"
+    },
+    {
+      "parameters": {
+        "url": "https://www.alphavantage.co/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "function",
+              "value": "OVERVIEW"
+            },
+            {
+              "name": "symbol",
+              "value": "={{ $json.symbol }}"
+            },
+            {
+              "name": "apikey",
+              "value": "0LXKHUKDX1ZD42DD"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        160
+      ],
+      "id": "6ed0ede8-bfc2-434d-aab0-d1240c247605",
+      "name": "Overview3"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.Symbol }} AND {{ $json.Name }} AND (stock OR earnings OR financial OR revenue OR shares OR analyst OR market OR \"stock price\")"
+            },
+            {
+              "name": "from",
+              "value": "=from: {{ $now.minus({days: 7}).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $now.toISO().split('T')[0] }}"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "pageSize",
+              "value": "=2"
+            },
+            {
+              "name": "apiKey",
+              "value": "82e1041833df46738ba74354c891fdf7"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        160
+      ],
+      "id": "b6f0c84a-33af-4e5c-9d0f-0ee5451fbf6d",
+      "name": "Competitor2 News"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1240,
+        420
+      ],
+      "id": "dbd81865-4f72-4b05-bccf-c745b5b74125",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "0h9ABSgX9AueTiCT",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Company:  {{ $('Overview1').item.json.Name }}({{ $('Overview1').item.json.Symbol }})\n\nArticles to filter:\n{{ JSON.stringify($json.articles, null, 2) }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are filtering news articles for relevance to a specific company for an investor relations report.\n\nAn article is RELEVANT if it:\n- Mentions the company name or ticker symbol directly\n- Discusses the company's business, products, or services\n- Contains analyst opinions, ratings, or price targets for the company\n- Reports on the company's financial performance or outlook\n- Covers industry trends that specifically impact the company\n\nReturn ONLY the relevant articles in this exact JSON format:\n[\n  {\n    \"title\": \"Article Title\",\n    \"description\": \"Article description\",\n    \"url\": \"Article URL\",\n    \"publishedAt\": \"2025-06-10T15:46:08Z\",\n    \"source\": \"Source Name\"\n  }\n]\n\nIf no articles are relevant, return: []"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1020,
+        -160
+      ],
+      "id": "c346e373-b9d9-476b-9bc9-a4dcffe387ba",
+      "name": "Relevance1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Company:  {{ $('Overview2').item.json.Name }}({{ $('Overview2').item.json.Symbol }})\n\nArticles to filter:\n{{ JSON.stringify($json.articles, null, 2) }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are filtering news articles for relevance to a specific company for an investor relations report.\n\nAn article is RELEVANT if it:\n- Mentions the company name or ticker symbol directly\n- Discusses the company's business, products, or services\n- Contains analyst opinions, ratings, or price targets for the company\n- Reports on the company's financial performance or outlook\n- Covers industry trends that specifically impact the company\n\nReturn ONLY the relevant articles in this exact JSON format:\n[\n  {\n    \"title\": \"Article Title\",\n    \"description\": \"Article description\",\n    \"url\": \"Article URL\",\n    \"publishedAt\": \"2025-06-10T15:46:08Z\",\n    \"source\": \"Source Name\"\n  }\n]\n\nIf no articles are relevant, return: []"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1020,
+        0
+      ],
+      "id": "3316f7d1-7cc1-4a91-83d5-22d5678c5340",
+      "name": "Relevance 2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Company:  {{ $('Overview3').item.json.Name }}({{ $('Overview3').item.json.Symbol }})\n\nArticles to filter:\n{{ JSON.stringify($json.articles, null, 2) }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are filtering news articles for relevance to a specific company for an investor relations report.\n\nAn article is RELEVANT if it:\n- Mentions the company name or ticker symbol directly\n- Discusses the company's business, products, or services\n- Contains analyst opinions, ratings, or price targets for the company\n- Reports on the company's financial performance or outlook\n- Covers industry trends that specifically impact the company\n\nReturn ONLY the relevant articles in this exact JSON format:\n[\n  {\n    \"title\": \"Article Title\",\n    \"description\": \"Article description\",\n    \"url\": \"Article URL\",\n    \"publishedAt\": \"2025-06-10T15:46:08Z\",\n    \"source\": \"Source Name\"\n  }\n]\n\nIf no articles are relevant, return: []"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1020,
+        160
+      ],
+      "id": "314567cf-20a8-4de6-b185-2bfaf8f3458c",
+      "name": "Relevance 3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced: Handle coordinator input format\nlet companyArticles = [];\nlet competitorArticles = [];\nlet companyOverview = null;\nlet competitorOverviews = [];\n\n// Get original data - handle different input formats\nlet originalData;\ntry {\n  // Try coordinator format first\n  originalData = $input.first().json;\n  \n  // If no Competitors field, check if it's nested\n  if (!originalData.Competitors && originalData.originalData) {\n    originalData = originalData.originalData;\n  }\n  \n  // Debug what we're receiving\n  console.log('Input data keys:', Object.keys(originalData));\n  console.log('Competitors field:', originalData.Competitors);\n  \n} catch (e) {\n  console.log('Error accessing input data:', e.message);\n  return { error: \"Cannot access input data\", details: e.message };\n}\n\n// Validate required fields\nif (!originalData.Competitors) {\n  return { \n    error: \"Missing Competitors field\", \n    receivedData: originalData,\n    availableKeys: Object.keys(originalData || {})\n  };\n}\n\nconst competitors = originalData.Competitors.split(',').map(c => c.trim());\n\n// Rest of your existing code remains the same...\n// (Keep all the Overview and Relevance accessing code as is)\n\n// Get company overview data (Overview1)\ntry {\n  const overview1 = $('Overview1').first().json;\n  companyOverview = {\n    symbol: overview1.Symbol,\n    name: overview1.Name,\n    description: overview1.Description,\n    marketCap: overview1.MarketCapitalization,\n    peRatio: overview1.PERatio,\n    week52High: overview1[\"52WeekHigh\"],\n    week52Low: overview1[\"52WeekLow\"],\n    analystTargetPrice: overview1.AnalystTargetPrice\n  };\n  console.log('Company overview captured for:', overview1.Symbol);\n} catch (e) {\n  console.log('Error accessing Overview1:', e.message);\n}\n\n// Get company news (Relevance1)\ntry {\n  const companyNews = $('Relevance1').first().json;\n  companyArticles = JSON.parse(companyNews.text || '[]');\n  console.log('Company articles found:', companyArticles.length);\n} catch (e) {\n  console.log('Error accessing Relevance1:', e.message);\n}\n\n// Get competitor 1 overview and news\ntry {\n  const overview2 = $('Overview2').first().json;\n  const comp1Overview = {\n    symbol: overview2.Symbol,\n    name: overview2.Name,\n    description: overview2.Description,\n    marketCap: overview2.MarketCapitalization,\n    peRatio: overview2.PERatio,\n    week52High: overview2[\"52WeekHigh\"],\n    week52Low: overview2[\"52WeekLow\"],\n    analystTargetPrice: overview2.AnalystTargetPrice\n  };\n  competitorOverviews.push(comp1Overview);\n  \n  const comp1News = $('Relevance 2').first().json;\n  const comp1Articles = JSON.parse(comp1News.text || '[]');\n  \n  const taggedArticles1 = comp1Articles.map(article => ({\n    ...article,\n    competitor: competitors[0],\n    competitorName: overview2.Name || competitors[0]\n  }));\n  \n  competitorArticles.push(...taggedArticles1);\n  console.log('Competitor 1 data captured:', overview2.Symbol);\n} catch (e) {\n  console.log('Error accessing competitor 1 data:', e.message);\n}\n\n// Get competitor 2 overview and news\ntry {\n  const overview3 = $('Overview3').first().json;\n  const comp2Overview = {\n    symbol: overview3.Symbol,\n    name: overview3.Name,\n    description: overview3.Description,\n    marketCap: overview3.MarketCapitalization,\n    peRatio: overview3.PERatio,\n    week52High: overview3[\"52WeekHigh\"],\n    week52Low: overview3[\"52WeekLow\"],\n    analystTargetPrice: overview3.AnalystTargetPrice\n  };\n  competitorOverviews.push(comp2Overview);\n  \n  const comp2News = $('Relevance 3').first().json;\n  const comp2Articles = JSON.parse(comp2News.text || '[]');\n  \n  const taggedArticles2 = comp2Articles.map(article => ({\n    ...article,\n    competitor: competitors[1],\n    competitorName: overview3.Name || competitors[1]\n  }));\n  \n  competitorArticles.push(...taggedArticles2);\n  console.log('Competitor 2 data captured:', overview3.Symbol);\n} catch (e) {\n  console.log('Error accessing competitor 2 data:', e.message);\n}\n\nreturn {\n  primaryCompany: {\n    type: \"primary\",\n    articles: companyArticles,\n    overview: companyOverview\n  },\n  competitors: competitorArticles,\n  competitorOverviews: competitorOverviews,\n  summary: {\n    primaryArticles: companyArticles.length,\n    competitorArticles: competitorArticles.length,\n    processedAt: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "812392fd-00da-48f3-bfb8-d7af7930b27b",
+      "name": "Combine news and Data"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -120,
+        0
+      ],
+      "id": "73d5ea75-9fe3-47ba-936d-0962508a4456",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Company News": {
+      "main": [
+        [
+          {
+            "node": "Relevance1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Symbols": {
+      "main": [
+        [
+          {
+            "node": "Break into 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Break into 3": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Overview1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Overview2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Overview3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitor1 News": {
+      "main": [
+        [
+          {
+            "node": "Relevance 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overview1": {
+      "main": [
+        [
+          {
+            "node": "Company News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overview2": {
+      "main": [
+        [
+          {
+            "node": "Competitor1 News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overview3": {
+      "main": [
+        [
+          {
+            "node": "Competitor2 News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitor2 News": {
+      "main": [
+        [
+          {
+            "node": "Relevance 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Relevance1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Relevance 2",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Relevance 3",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relevance1": {
+      "main": [
+        [
+          {
+            "node": "Combine news and Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relevance 2": {
+      "main": [
+        [
+          {
+            "node": "Combine news and Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relevance 3": {
+      "main": [
+        [
+          {
+            "node": "Combine news and Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine news and Data": {
+      "main": [
+        []
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Split Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "05afefae-7ba3-432c-b3b1-4feba35df973",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d735d77f21fd4aef6b73e3673b1ecc97bb1c1f558cf83cdb9413cefd83cbd75c"
+  },
+  "id": "jGWN8PDfw5upd7Rg",
+  "tags": []
+}

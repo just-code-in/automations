@@ -1,0 +1,1012 @@
+{
+  "name": "IR Daily Report Coordinator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "459ae7b9-97ac-44c8-8c54-bc642aa79101",
+      "name": "Daily Schedule (6:00 AM PST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -520,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"recipientEmail\": \"justin.s.simpson@gmail.com\",\n  \"sheetId\": \"1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE\",\n  \"sheetName\": \"IR Daily\"\n}\n",
+        "options": {}
+      },
+      "id": "435f51f1-dc76-4d51-aeca-1e4d4e2d5573",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        -320,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1L_ZAv3FKpYRS8JXh4_eDsHkF_5WnPQl7Byz9RBNF9iE/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "35036fb0-88ad-470d-9e17-752bdc25b08a",
+      "name": "Read Company List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -160,
+        20
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WOIhnx5l3FPYsfrv",
+          "name": "Google "
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process ALL company data from Google Sheets\nconst allInputs = $input.all();\nconst configData = $('Configuration').first().json;\n\n// Extract company data from all inputs\nconst companies = allInputs.map((inputItem, index) => {\n  const row = inputItem.json;\n  return {\n    id: index + 1,\n    ticker: row.Symbol?.trim() || '',\n    industry: row.Industry?.trim() || '',\n    competitors: row.Competitors?.trim() || '',\n    cik: row.CIK?.trim() || ''\n  };\n}).filter(company => company.ticker);\n\n// Add configuration to each company\nconst processedCompanies = companies.map(company => ({\n  ...company,\n  config: {\n    recipientEmail: configData.recipientEmail,\n    reportDate: new Date().toISOString().split('T')[0],\n    processedAt: new Date().toISOString()\n  }\n}));\n\nreturn [\n  {\n    json: {\n      companies: processedCompanies,\n      metadata: {\n        totalCompanies: processedCompanies.length,\n        reportDate: new Date().toISOString().split('T')[0],\n        startTime: new Date().toISOString(),\n        recipientEmail: configData.recipientEmail\n      }\n    }\n  }\n];\n"
+      },
+      "id": "9ab65347-a50c-4760-b586-59d3184ca1fc",
+      "name": "Process Company List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine summaries and insights for refinement\nconst companyData = $('Combine Agent Results').first().json;\nconst summaries = $('Call Summarization Agent').first().json;\nconst insights = $('Call Insight Generation Agent').first().json;\n\n// Structure data for the refinement agent\nreturn {\n  reportData: {\n    ticker: companyData.ticker,\n    stockPrice: companyData.companyData.stockPrice,\n    summaries: summaries.summaries || {},\n    keyInsight: insights.insight || { text: 'No insight available' },\n    metadata: {\n      processedAt: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "9834ddce-6e29-487a-b2c7-734b1ed8e327",
+      "name": "Prepare for Refinement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2920,
+        -420
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": "Single Company Report Refinement Agent",
+        "options": {}
+      },
+      "id": "ccf2127f-647c-478b-9a31-b4a3336dad07",
+      "name": "Call Refinement Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        3180,
+        -420
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store refined company report\nconst refinedData = $input.first().json;\nconst originalData = $('Combine Agent Results').first().json;\n\nreturn {\n  ticker: originalData.ticker,\n  refinedReport: refinedData.refinedReport || { text: 'Report generation failed' },\n  completedAt: new Date().toISOString()\n};"
+      },
+      "id": "ece97cea-0f8b-481a-be19-5f0768b108d8",
+      "name": "Store Company Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3400,
+        -420
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "20a1e9eb-229b-45f4-bf2a-7b616a799f8c",
+      "name": "Continue Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3960,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all company reports for final delivery\nconst allReports = $input.all();\nconst metadata = $('Process Company List').first().json.metadata;\n\n// Structure final report data\nconst finalReportData = {\n  reportMetadata: {\n    reportDate: metadata.reportDate,\n    generatedAt: new Date().toISOString(),\n    recipientEmail: metadata.recipientEmail\n  },\n  companies: allReports.map(report => ({\n    ticker: report.json.ticker,\n    refinedReport: report.json.refinedReport\n  }))\n};\n\nreturn {\n  finalReportData: finalReportData\n};"
+      },
+      "id": "2da8f64b-71de-4c20-9c8b-b209ef91d5c6",
+      "name": "Compile All Reports",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4260,
+        -440
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": "Report Compilation & Delivery Agent",
+        "options": {}
+      },
+      "id": "8d279568-edb0-4988-9aae-9e145a9f3c0a",
+      "name": "Call Delivery Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        4480,
+        -420
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "id": "ebc25c0a-187e-489a-abc5-f8b96eb27a93",
+      "name": "Execution Summary",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4860,
+        -460
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        -240
+      ],
+      "id": "69a4e2d6-311e-4855-be45-c1284a412e02",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HPmSsQsbOAVCRjx0",
+          "mode": "list",
+          "cachedResultName": "Stock Price Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -760
+      ],
+      "id": "46a5ac33-a984-42a1-a322-c9ade63b5335",
+      "name": "Call Stock Price Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare companies for looping\nconst input = $input.first().json;\nconst companies = input.companies || [];\n\n// Return each company as a separate item for the loop\nreturn companies;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -240
+      ],
+      "id": "c3a6427f-fce6-43ef-bdfe-55d5c54ecb50",
+      "name": "Split out Companies"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "jGWN8PDfw5upd7Rg",
+          "mode": "list",
+          "cachedResultName": "Company & Competitor Research AgentV2"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -580
+      ],
+      "id": "e20f9048-03bb-44e9-b377-0ae2a4712dce",
+      "name": "Call Company & Competitor Research Agent"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Jv1IadFWHZxC7DPh",
+          "mode": "list",
+          "cachedResultName": "Industry Research Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        20
+      ],
+      "id": "ebfb259f-3372-4cb0-b93f-cc785a99558b",
+      "name": "Call Industry Research Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "zSI7SUDJa0EaU4z7",
+          "mode": "list",
+          "cachedResultName": "Macroeconomic Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -380
+      ],
+      "id": "e0a1b913-84c4-4991-be11-d052f9215560",
+      "name": "Call Macroeconomic Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "U1kMXotSHPAta0NW",
+          "mode": "list",
+          "cachedResultName": "Social Media Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -180
+      ],
+      "id": "8aebf8f4-7292-47bf-a114-6dcb5dbf171a",
+      "name": "Call Social Media Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2500,
+        -140
+      ],
+      "id": "e9ef0769-7a65-44c3-9d64-113b205fedd0",
+      "name": "Call Insight Generation Agent1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2480,
+        -680
+      ],
+      "id": "c6d28825-61be-4fd2-9bc7-466cd4c0c132",
+      "name": "Call Summarisation Agent",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3600,
+        -420
+      ],
+      "id": "0c32909a-7b0f-4b0c-b952-35f771f9b06f",
+      "name": "Wait",
+      "webhookId": "717f7acb-eadb-41da-aa34-19d08ab875af"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform coordinator data for ALL agents\nconst companyData = $input.first().json;\n\nconsole.log('Processing company:', companyData.ticker);\n\nreturn [\n  // Item 1: For Stock Price Agent\n  {\n    agentType: 'stockPrice',\n    ticker: companyData.ticker\n  },\n  \n  // Item 2: For Company Research Agent  \n  {\n    agentType: 'companyResearch',\n    ticker: companyData.ticker,\n    competitors: companyData.competitors,\n    cik: companyData.cik\n  },\n  \n  // Item 3: For Industry Research Agent\n  {\n    agentType: 'industryResearch',\n    industry: companyData.industry,\n    ticker: companyData.ticker\n  },\n  \n  // Item 4: For Social Media Agent\n  {\n    agentType: 'socialMedia',\n    ticker: companyData.ticker,\n    companyName: companyData.ticker\n  },\n  \n  // Item 5: For Macroeconomic Agent\n  {\n    agentType: 'macroeconomic',\n    ticker: companyData.ticker,\n    industry: companyData.industry\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        -240
+      ],
+      "id": "df46026e-22fd-4c0a-bdf6-88f7a92b9839",
+      "name": "Transform Company Data"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "stockPrice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "83b25091-ceea-4c04-91ed-c02cd4c21300"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cb21b577-a6a8-449e-8c32-9645bb6ff652",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "companyResearch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1317dcbc-edd6-481a-b25c-e56c7d85fe2e",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "industryResearch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "52380ef5-e488-435e-9e6a-425d14c4661d",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "socialMedia",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "94bfd2db-6728-4672-b4d0-863aea0427d7",
+                    "leftValue": "={{ $json.agentType }}",
+                    "rightValue": "macroeconomic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        680,
+        -380
+      ],
+      "id": "d1e5aa57-e925-4392-a777-cd78f85e8c70",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process the Summary Builder output\nconst allInputs = $input.all();\nconsole.log('Total inputs received:', allInputs.length);\n\n// Get the first input from Summary Builder\nconst summaryData = allInputs[0].json;\n\nif (!summaryData) {\n  return {\n    error: \"No summary data received\",\n    totalInputs: allInputs.length\n  };\n}\n\nconsole.log('Summary Builder keys:', Object.keys(summaryData));\n\n// Extract ticker from Summary Builder output\nconst ticker = summaryData.ticker || \"UNKNOWN\";\n\nconsole.log('Extracted ticker:', ticker);\n\nconst combinedResults = {\n  ticker: ticker,\n  stockPrice: summaryData.stockPrice || null,\n  companyResearch: summaryData.companyResearch || null,\n  companyOverview: summaryData.companyOverview || null,        // NEW\n  competitorOverviews: summaryData.competitorOverviews || null, // NEW\n  industryResearch: summaryData.industryResearch || null,\n  socialMedia: summaryData.socialMedia || null,\n  macroeconomic: summaryData.macroeconomic || null,\n  metadata: {\n    processedAt: new Date().toISOString(),\n    totalAgents: 1,\n    summaryKeys: Object.keys(summaryData)\n  }\n};\n\nconsole.log('Successfully processed Summary Builder output');\nreturn combinedResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2140,
+        -380
+      ],
+      "id": "8eb0f8f1-c064-49b9-aec7-f48a7828834a",
+      "name": "Combine"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        1780,
+        -420
+      ],
+      "id": "de9cf444-22b1-4b3b-8af3-d1caa6be91e0",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        -180
+      ],
+      "id": "f85b1196-1cc0-4d85-b03f-1050f6d8bebd",
+      "name": "Aggregate",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        0
+      ],
+      "id": "5296ec54-2005-4132-b67c-76dd3f2012e5",
+      "name": "Aggregate1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      row_number: 2,\n      Symbol: \"TSLA\",\n      Industry: \"Electric Cars\",\n      Competitors: \"GM, F\",\n      CIK: \"0001318605\"\n    }\n  },\n  {\n    json: {\n      row_number: 3,\n      Symbol: \"OKLO\",\n      Industry: \"Nuclear\",\n      Competitors: \"EBR, LNT\",\n      CIK: \"0001849056\"\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        -240
+      ],
+      "id": "77e2a092-6297-4a0f-bf83-ecd933a229ae",
+      "name": "Simulate Google Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5c3bb3e-6722-49b8-8ca7-16f542b1d579",
+              "name": "=ticker",
+              "value": "={{(() => {   try {     const symbol = $json.allInputs[0][\"Meta Data\"][\"2. Symbol\"];     return symbol || \"UNKNOWN\";   } catch (e) {     return \"ERROR\";   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "bf323993-79a4-45d2-ac22-429213bb6b48",
+              "name": "stockPrice",
+              "value": "={{(() => {\n  try {\n    const stockData = $json.allInputs?.[0];\n    if (!stockData) return \"No stock data found\";\n    \n    const timeSeries = stockData[\"Time Series (Daily)\"];\n    if (!timeSeries) return \"No Time Series found\";\n    \n    const sortedDates = Object.keys(timeSeries).sort().reverse();\n    \n    if (sortedDates.length < 2) {\n      return \"Insufficient data for comparison\";\n    }\n    \n    const latestDate = sortedDates[0];\n    const previousDate = sortedDates[1];\n    \n    const latestPrice = parseFloat(timeSeries[latestDate][\"4. close\"]);\n    const previousPrice = parseFloat(timeSeries[previousDate][\"4. close\"]);\n    \n    if (!latestPrice || !previousPrice) return \"Invalid price data\";\n    \n    const percentChange = ((latestPrice - previousPrice) / previousPrice) * 100;\n    const changeDirection = percentChange >= 0 ? \"+\" : \"\";\n    const changeColor = percentChange >= 0 ? \"📈\" : \"📉\";\n    \n    return `$${latestPrice.toFixed(2)} (${latestDate}) ${changeColor} ${changeDirection}${percentChange.toFixed(2)}% from $${previousPrice.toFixed(2)} (${previousDate})`;\n  } catch (e) {\n    return `Error: ${e.message}`;\n  }\n})().trim()}}",
+              "type": "string"
+            },
+            {
+              "id": "60e307fc-2734-443c-9485-5b63feb6f0e5",
+              "name": "=macroeconomic",
+              "value": "={{(() => {\n  try {\n    const articles = $json.categorizedArticles?.monetaryPolicy || [];\n    return articles.map(a => `- ${a.title} (${a.impact})`).join('\\n') || null;\n  } catch (e) {\n    return null;\n  }\n})()}}\n\n",
+              "type": "string"
+            },
+            {
+              "id": "d0c03cf6-6dc4-4284-afce-d8b61f5bbfba",
+              "name": "=companyResearch",
+              "value": "={{(() => {\n  try {\n    const primary = $json.primaryCompany?.articles || [];\n    const competitors = $json.competitors || [];\n    \n    let result = [];\n    \n    if (primary.length > 0) {\n      result.push(`Company News: ${primary.map(a => `- ${a.title}`).join('\\n')}`);\n    }\n    \n    if (competitors.length > 0) {\n      result.push(`Competitor News: ${competitors.map(a => `- ${a.title} (${a.competitorName})`).join('\\n')}`);\n    }\n    \n    return result.length > 0 ? result.join('\\n\\n') : \"No recent company or competitor news found\";\n  } catch (e) {\n    return `Error: ${e.message}`;\n  }\n})()}}",
+              "type": "string"
+            },
+            {
+              "id": "21ab2df0-5e04-4349-af5d-6c3b3de65329",
+              "name": "=industryResearch",
+              "value": "={{(() => {\n  try {\n    // Find the industry data in the data array\n    const industryData = $json.data?.find(d => d.industryNews);\n    const industry = industryData?.industryNews || [];\n    \n    if (industry.length === 0) {\n      return \"No industry articles found\";\n    }\n    return industry.map(a => `- ${a.title}`).join('\\n');\n  } catch (e) {\n    return `Error: ${e.message}`;\n  }\n})()}}",
+              "type": "string"
+            },
+            {
+              "id": "93b24d6f-3a83-4730-9e17-08bae929518b",
+              "name": "=socialMedia",
+              "value": "={{(() => {   try {     const debug = $json;     const social = debug.data?.find(d => d.type === 'social_media_analysis');     const mentions = social?.socialMentions || [];     return mentions.map(m => `- ${m.title} (${m.sentiment})`).join('\\n') || null;   } catch (e) {     return null;   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "9749420f-b94c-4f5f-895b-820dd0503502",
+              "name": "companyOverview",
+              "value": "={{(() => {   try {     const overview = $json.primaryCompany?.overview;     if (!overview) return \"No company overview found\";          return `${overview.name} - Market Cap: $${(overview.marketCap/1000000000).toFixed(1)}B, P/E: ${overview.peRatio}, 52W Range: $${overview.week52Low}-$${overview.week52High}, Target: $${overview.analystTargetPrice}`;   } catch (e) {     return `Error: ${e.message}`;   } })()}}",
+              "type": "string"
+            },
+            {
+              "id": "ecb278ba-f6ea-4c19-87e1-cc0f1192c06e",
+              "name": "=competitorOverviews",
+              "value": "={{(() => {   try {     const overviews = $json.competitorOverviews || [];     if (overviews.length === 0) return \"No competitor data found\";          return overviews.map(comp =>        `${comp.name} (${comp.symbol}) - P/E: ${comp.peRatio}, Target: $${comp.analystTargetPrice}`     ).join(' | ');   } catch (e) {     return `Error: ${e.message}`;   } })()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1960,
+        -380
+      ],
+      "id": "161429b6-f6b3-41ed-8013-c49ebecbd217",
+      "name": "Summary Builder"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Simulate Google Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Company List": {
+      "main": [
+        [
+          {
+            "node": "Split out Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Refinement": {
+      "main": [
+        [
+          {
+            "node": "Call Refinement Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Refinement Agent": {
+      "main": [
+        [
+          {
+            "node": "Store Company Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Company Report": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Compile All Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile All Reports": {
+      "main": [
+        [
+          {
+            "node": "Call Delivery Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Delivery Agent": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Stock Price Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out Companies": {
+      "main": [
+        [
+          {
+            "node": "Transform Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Company & Competitor Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Call Industry Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Macroeconomic Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Call Social Media Agent": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Insight Generation Agent1": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Refinement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Summarisation Agent": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Refinement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Company Data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Call Stock Price Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Company & Competitor Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Industry Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Social Media Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Macroeconomic Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine": {
+      "main": [
+        [
+          {
+            "node": "Call Summarisation Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call Insight Generation Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Summary Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Simulate Google Data": {
+      "main": [
+        [
+          {
+            "node": "Process Company List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Builder": {
+      "main": [
+        [
+          {
+            "node": "Combine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "041ed589-6585-4f11-b6ba-f90fda413903",
+  "meta": {
+    "instanceId": "d735d77f21fd4aef6b73e3673b1ecc97bb1c1f558cf83cdb9413cefd83cbd75c"
+  },
+  "id": "LWJRVrhzY3bhmHkO",
+  "tags": [
+    {
+      "createdAt": "2025-05-22T21:33:08.661Z",
+      "updatedAt": "2025-05-22T21:33:08.661Z",
+      "id": "O2FerL4GKq0z4Mcn",
+      "name": "JSS"
+    },
+    {
+      "createdAt": "2025-05-26T21:26:05.460Z",
+      "updatedAt": "2025-05-26T21:26:05.460Z",
+      "id": "ZqSmdDn7kllsb9e4",
+      "name": "IR"
+    }
+  ]
+}
